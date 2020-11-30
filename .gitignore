@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Python virtualenv
+venv/
+
+# PyCharm project file
+.idea/
+
 # C extensions
 *.so
 
