@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, time
+import os, sys, time, re
 import datetime
 import subprocess
 from enum import Enum
@@ -16,35 +16,6 @@ from firebase_admin import firestore
 
 import google.cloud.logging
 import logging
-
-
-def RunCommandInternal(process):
-    while True:
-        line = process.stdout.readline().rstrip()
-        if not line:
-            break
-        yield line
-
-def EchoRunCommand( settings, command):
-    print( " ".join(command), flush=True )
-
-    if (settings.dryRun):
-        return (0, [], datetime.timedelta(0) )
-
-    startTime = datetime.datetime.now()
-
-    result = []
-    process = subprocess.Popen(command, stdout=subprocess.PIPE) #, shell=True)
-
-    for line in RunCommandInternal( process ):
-        print(line, flush=True)
-        result.append( line )
-
-    process.wait()
-
-    endTime = datetime.datetime.now()
-
-    return (process.returncode, result, endTime - startTime)
 
 # TODO: Handle this from config somewhere
 # # export GOOGLE_APPLICATION_CREDENTIALS=/Users/joeld/stuff/firebasetest/firestore-key.json
@@ -68,15 +39,16 @@ class JobStatus( str, Enum ):
 
 class TKBuildJob(object ):
 
-    def __init__(self, projectId):
-        self.jobKey = "0000000"
+    def __init__(self, projectId, jobKey = "0000000"):
         self.platform = "Unknown"
+        self.jobKey = jobKey
         self.projectId = projectId
         self.commitVer = "1234"
         self.errorCount = 0
         self.warnCount = 0
         self.logLink = ""
         self.githubJson = None
+        self.jobDirShort = "nojobdir"
         self.worksteps = {
             "fetch" : JobStatus.TODO
         }
@@ -85,11 +57,13 @@ class TKBuildJob(object ):
 
         return f'<TKBuildJob({self.jobKey},projectId={self.projectId},commitVer={self.commitVer})>'
 
-    def hasWorkRemaining(self):
-        for status in self.worksteps.values():
-            print("hasWorkRemaing, status ", status, JobStatus.TODO)
-            if status == JobStatus.TODO:
-                return True
+    def hasWorkRemaining(self, worksteps ):
+        for stepname in worksteps:
+            if stepname in self.worksteps:
+                status = self.worksteps[stepname]
+                if status == JobStatus.TODO:
+                    return True
+
         return False
 
     def setWorkstepStatus(self, workstep, status ):
@@ -118,9 +92,8 @@ class TKBuildJob(object ):
     @classmethod
     def createFromFirebaseDict(cls, jobKey, jobDict ):
 
-        job = cls( jobKey )
+        job = cls( jobDict.get( 'projectId' ), jobKey )
         job.platform = jobDict.get( 'platform'  )
-        job.projectId = jobDict.get( 'projectId' )
         job.commitVer = jobDict.get( 'commitVer' )
         job.errorCount = jobDict.get( 'errorCount' )
         job.warnCount = jobDict.get( 'warnCount' )
@@ -132,6 +105,8 @@ class TKBuildJob(object ):
 
         # Worksteps is a string : string dict in both, no conversion needed
         job.worksteps =jobDict.get( 'worksteps' )
+
+        job.jobDirShort = job.projectId + "_" + jobKey
 
         return job
 
@@ -175,6 +150,12 @@ class TKBuildProject(object):
 
                 proj.workstepDefs.append( step )
 
+        # Make an ordered list of workstep names for easy checking
+        wsnames = []
+        for wsdef in proj.workstepDefs:
+            wsnames.append( wsdef.stepname )
+        proj.workstepNames = wsnames
+
         return proj
 
 
@@ -209,8 +190,10 @@ class TKBuildAgent(object):
     def __init__(self ):
         self.name = "unnamed-build-agent"
         self.desc = "TkBuild Build Agent"
+        self.tkbuildDir = "/tmp/tkbuild/"
         self.googleCredentialFile = "MISSING"
         self.googleProjectId = "my-projectid-00000"
+        self.dryRun = False
         self.projects = {}
         self.platform = platform.system() # e.g. "Darwin"
         self.serverDone = False
@@ -227,14 +210,15 @@ class TKBuildAgent(object):
         self.currentJob = None
 
     @classmethod
-    def createFromConfig( cls, configData ):
-        agentCfg = configData.get("build-agent")
+    def createFromConfig( cls, configData, tkBuildDir ):
 
         agentCfg = configData.get("build-agent")
 
         agent = cls()
         agent.name = agentCfg.get( 'name', agent.name )
         agent.desc = agentCfg.get( 'desc', agent.desc )
+
+        agent.tkbuildDir = tkBuildDir
 
         gcloudConfig = agentCfg.get('gcloud', {} )
         agent.googleCredentialFile = gcloudConfig.get( 'credfile', agent.googleCredentialFile )
@@ -251,7 +235,7 @@ class TKBuildAgent(object):
 
     def commitJobChanges( self, job):
 
-        job_ref = self.jobs_ref.get( job.jobKey )
+        job_ref = self.jobs_ref.document( job.jobKey )
         job_ref.set( job.toFirebaseDict() )
 
 
@@ -280,12 +264,15 @@ class TKBuildAgent(object):
     @classmethod
     def createFromConfigFile(cls, agentConfigFile ):
 
+        # Use where the agent Cfg is located as the default for the build dir
+        defaultTkBuildDir = os.path.split( agentCfgFile )[0]
+
         if not os.path.exists(agentConfigFile):
             logging.warning("WARN: agent config file doesn't exist or can't be read:", agentConfigFile)
         else:
             with open(agentConfigFile) as fpconfig:
                 configData = yaml.full_load(fpconfig)
-                return cls.createFromConfig( configData )
+                return cls.createFromConfig( configData, defaultTkBuildDir )
 
     def serverMainloop(self, db ):
 
@@ -301,15 +288,18 @@ class TKBuildAgent(object):
 
         # Make some test jobs
         # testJob = TKBuildJob("testrepo")
-        # testJob.commitVer = "ZZBLAR"
-        # testJob.worksteps = {"fetch": "todo",
-        #                      "build": "todo",
-        #                      "archive": "todo"}
-        #
-        # print(f"Testjob: {testJob}")
+        # testJob.commitVer = "f5c86435acd0af16561eeaaa74225d4b93829115"
+        # testJob.worksteps = {"fetch": JobStatus.TODO,
+        #                      "build": JobStatus.TODO }
 
-        # testJobRef = db.collection(u'jobs').document()
-        # testJobRef.set(testJob.toFirebaseDict())
+        testJob = TKBuildJob("tkwordlist")
+        testJob.commitVer = "05350960499b752bc13dd56144d6be8632ad82ca"
+        testJob.worksteps = {"fetch": JobStatus.TODO,
+                             "build": JobStatus.TODO}
+
+        print(f"Testjob: {testJob}")
+        testJobRef = db.collection(u'jobs').document()
+        testJobRef.set(testJob.toFirebaseDict())
 
         # Run the mainloop
         while not self.serverDone:
@@ -325,14 +315,16 @@ class TKBuildAgent(object):
         logging.info( f"Agent update ... {self.updCount}")
         self.updCount += 1
 
-
         logging.info( f" {len(self.jobList)} avail jobs:")
+
         # Check if there are any jobdirs that do not exist in the job list. If so, clean up those job dirs.
         for job in self.jobList:
             logging.info( f"JOB: {job.jobKey} steps: {job.worksteps} ")
 
+            proj = self.projects[job.projectId]
+
             # If the job has work left to do
-            if job.hasWorkRemaining():
+            if job.hasWorkRemaining( proj.workstepNames ):
                 print("job ", job, "has work left...")
                 self.currentJob = job
                 break
@@ -356,6 +348,23 @@ class TKBuildAgent(object):
         #     - Do the workstep (call $PROJECT_DIR/workdir/$REPO_NAME/tkbuild workstep)
         #     - Change the workstep status to “Completed” or “Failed”
 
+    def failJob(self, job, wsdefFailed ):
+
+        logging.error( f"Job {job.jobKey} failed.")
+
+        # Go through the worksteps until we find the one that failed.
+        # Mark it as failed, and any subsequent ones as cancelled
+        proj = self.projects[job.projectId]
+        foundFailedStep = False
+        for wsdef in proj.workstepDefs:
+            if not foundFailedStep and wsdef.stepname == wsdefFailed.stepname:
+                foundFailedStep = True
+                job.worksteps[ wsdef.stepname ] = JobStatus.FAIL
+            elif foundFailedStep and job.worksteps[ wsdef.stepname ] == JobStatus.TODO:
+                job.worksteps[wsdef.stepname] = JobStatus.CANCEL
+
+        self.commitJobChanges( job )
+
 
     def runNextJobStep(self, job ):
 
@@ -367,14 +376,153 @@ class TKBuildAgent(object):
             if ((wsdef.stepname in job.worksteps) and
                     (job.worksteps[wsdef.stepname] == JobStatus.TODO)):
 
-                logging.info( f"TODO: Will do job step {wsdef.stepname}" )
-                # TODO: actually do the workstep
-                #todo use EchoRunCommand to actually do the workstep
+                # Mark this workstep as running
+                job.worksteps[wsdef.stepname] = JobStatus.RUN
+                self.commitJobChanges( job )
+
+                # Open a logfile for this workstep
+                workstepLog = os.path.join( proj.workDir, "logs", job.jobDirShort + "_" + wsdef.stepname )
+                logPath = os.path.split( workstepLog )[0]
+                os.makedirs( logPath, exist_ok=True )
+
+                with open( workstepLog, "wt") as fpLog:
+                    fpLog.write( f"WORKSTEP: {wsdef.stepname}\n" )
+
+                    # Treat 'fetch' specially for now
+                    if wsdef.stepname == 'fetch':
+                        if not self.workstepFetch( job, wsdef, fpLog ):
+                            # The fetch failed for some reason, fail the workstep
+                            self.failJob( job, wsdef )
+                        else:
+                            job.worksteps[wsdef.stepname] = JobStatus.DONE
+                            self.commitJobChanges(job)
+
+                        break
+                    else:
+                        logging.info( f"Will do job step {wsdef.stepname}" )
+                        workdirRepoPath = os.path.join(proj.workDir, job.jobDirShort)
+                        if wsdef.cmd:
+
+                            # Fixme: allow array args or something to handle spaces in args
+                            stepCmd = []
+                            for stepCmdSplit in wsdef.cmd.split():
+
+                                # Replace the project dirs
+                                stepCmdSplit = stepCmdSplit.replace( "$TKBUILD", self.tkbuildDir )
+                                stepCmdSplit = stepCmdSplit.replace( "$WORKDIR", workdirRepoPath )
+
+                                stepCmd.append( stepCmdSplit )
+
+                            result, cmdTime = self.echoRunCommand( stepCmd, fpLog )
+                        else:
+                            logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
+
+
+                        job.worksteps[wsdef.stepname] = JobStatus.DONE
+                        self.commitJobChanges(job)
+
+                        break
+
+    # I don't like this workstep being hardcoded in the agent but not sure exactly
+    # how I want it to look so I'm putting it here for now.
+    def workstepFetch(self, job, wsdef, fpLog ):
+
+        proj = self.projects[job.projectId]
+
+        # see if the "pristine repo" exists
+        pristineRepoPath = os.path.join( proj.projectDir, proj.projectId + "_pristine" )
+        if not os.path.exists( pristineRepoPath ):
+            logging.info(f"Cloning pristine repo {pristineRepoPath}")
+            gitCmd = [ "git", "clone", wsdef.repoUrl, pristineRepoPath ]
+
+            retVal, cmdTime = self.echoRunCommand( gitCmd, fpLog )
+        else:
+            logging.info(f"Pristine repo exists at {pristineRepoPath}")
+
+        # Bring the pristine repo up to date with remote main
+        gitPullCmd = [ "git", "-C", pristineRepoPath,
+                       "pull" ]
+        retVal, cmdTime = self.echoRunCommand(gitPullCmd, fpLog )
+        if retVal:
+            return False
+
+        # Now clone the pristine repo into the work dir
+        workdirRepoPath = os.path.join( proj.workDir, job.jobDirShort )
+        if os.path.exists( workdirRepoPath ):
+            # Might make this a fatal error later, or nuke and re-copy this dir, but for
+            # now we'll allow this to make debugging easier.
+            logging.warning( f"Workdir repo {workdirRepoPath} already exists, using that.")
+        else:
+            gitCloneCommand = [ "git", "clone", pristineRepoPath, workdirRepoPath ]
+            retVal, cmdTime = self.echoRunCommand(gitCloneCommand, fpLog)
+            if retVal:
+                return False
+
+        # Now bring the workdir copy of the repo up to date with what we're
+        # trying to build
+        gitCheckoutCommand = [ "git", "-C", workdirRepoPath,
+                               "checkout", job.commitVer ]
+        retVal, cmdTime = self.echoRunCommand( gitCheckoutCommand, fpLog )
+        if retVal:
+            return False
+
+        return True
+
+    def _runCommandInternal( self, process):
+        while True:
+            line = process.stdout.readline().rstrip()
+            if not line:
                 break
+            yield line
 
+    def echoRunCommand( self, command, fpLog ):
+        """returns ( returnValue, timeTaken) """
+        cmdStr = " ".join(command)
+        fpLog.write( "CMD: " + cmdStr + "\n")
+        fpLog.flush()
 
+        logging.info(cmdStr)
 
+        if (self.dryRun):
+            return (0, datetime.timedelta(0))
 
+        startTime = datetime.datetime.now()
+
+        # FIXME: handle STDERR separately, but python makes this hard
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )  # , shell=True)
+
+        for linebytes in self._runCommandInternal(process):
+
+            line = linebytes.decode("utf-8")
+
+            isError = False
+            isWarn = False
+
+            # FIXME: Better parsing here, also make it tool-aware
+            if line.startswith( "fatal:") or line.startswith( "error:" ):
+                isError = True
+
+            if isError:
+                logging.error(line)
+                fpLog.write( "ERROR: "+ line + "\n")
+                fpLog.flush()
+            else:
+                logging.info( line )
+                fpLog.write( line + "\n")
+                fpLog.flush()
+
+        process.wait()
+
+        endTime = datetime.datetime.now()
+        cmdDuration = endTime - startTime
+
+        cmdStatus = f"Finished with retval {process.returncode} time taken {cmdDuration}";
+        logging.info( cmdStatus )
+
+        fpLog.write( cmdStatus + "\n\n\n" )
+        fpLog.flush()
+
+        return (process.returncode, cmdDuration)
 
 
 if __name__=='__main__':
@@ -397,7 +545,7 @@ if __name__=='__main__':
     db = firestore.client()
 
     # Initialize logging
-    do_cloud_logging = False
+    do_cloud_logging = True
     if do_cloud_logging:
         # logger = logging_client.logger("tkbuild-agent-" + agent.name )
         logging_client = google.cloud.logging.Client( )
@@ -406,10 +554,10 @@ if __name__=='__main__':
     else:
         logging.basicConfig( level=logging.INFO )
 
-    logging.debug("log debug")
-    logging.info("log info")
-    logging.warning("log warn")
-    logging.error("log error")
+    # logging.debug("log debug")
+    # logging.info("log info")
+    # logging.warning("log warn")
+    # logging.error("log error")
 
 
     logging.info ( f"Agent: {agent.name}: {agent.desc}" )
