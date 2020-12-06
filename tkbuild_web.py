@@ -25,13 +25,9 @@ def jobs_overview():
     jobs = []
     jobsData = agent.db.collection(u'jobs').get()
     for jobData in jobsData:
-        job = TKBuildJob.createFromFirebaseDict( jobData.id, jobData )
+        project = agent.projects[ jobData.get('projectId') ]
+        job = TKBuildJob.createFromFirebaseDict( project, jobData.id, jobData )
         jobs.append( job )
-
-    proj = agent.projects[ job.projectId ]
-    wsnames = []
-    for wsdef in proj.workstepDefs:
-        wsnames.append( wsdef.stepname )
 
     wsstyles = { 'done': 'bg-success',
                 'todo' : 'bg-secondary',
@@ -40,7 +36,19 @@ def jobs_overview():
                 'cancel' : 'bg-warning text-dark',
                 'run' : 'bg-info text-dark' }
 
-    return render_template('jobs.html', jobs=jobs, wsnames=wsnames, wsstyles=wsstyles, agent=agent )
+    allwsnames = []
+    for p in agent.projects.values():
+        for wsdef in p.workstepDefs:
+            if not wsdef.stepname in allwsnames:
+                allwsnames.append( wsdef.stepname )
+
+    return render_template('jobs.html', jobs=jobs, wsstyles=wsstyles, agent=agent, allwsnames = allwsnames )
+
+@app.route('/del_job/<jobkey>' )
+def del_job( jobkey ):
+
+    agent.db.collection(u'jobs').document( jobkey ).delete()
+    return redirect(url_for('jobs_overview'))
 
 @app.route('/add_job', methods=[ 'POST'])
 def add_job():
@@ -49,17 +57,22 @@ def add_job():
 
     commit = request.form.get('commit')
     if commit:
-        testJob = TKBuildJob( request.form['project'])
-        testJob.commitVer = commit.split()[0]
+        projId = request.form.get('project', "missing" )
+        proj = agent.projects[ projId ]
+        if not proj:
+            return ( f"ERROR: no project named '{projId}'." )
 
-        # TODO: Get these from project
-        testJob.worksteps = {"fetch": request.form.get( "wscheck-fetch", "skip" ),
-                             "build": request.form.get( "wscheck-fetch", "skip" ),
-                             }
+        addJob = TKBuildJob( proj )
+        addJob.commitVer = commit.split()[0]
 
-        print(f"Testjob: {testJob}")
+        # Set worksteps
+        addJob.worksteps = {}
+        for wsname in addJob.wsnames:
+            addJob.worksteps[ wsname ] = request.form.get( "wscheck-" + wsname, "skip" );
+
+        print(f"AddJob: {addJob}")
         testJobRef = agent.db.collection(u'jobs').document()
-        testJobRef.set(testJob.toFirebaseDict())
+        testJobRef.set(addJob.toFirebaseDict())
 
     return redirect(url_for('jobs_overview'))
 

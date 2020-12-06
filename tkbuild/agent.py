@@ -97,14 +97,18 @@ class TKBuildAgent(object):
     def commitJobChanges( self, job):
 
         job_ref = self.jobs_ref.document( job.jobKey )
-        job_ref.set( job.toFirebaseDict() )
+
+        jobData = job.toFirebaseDict()
+        print("CommitJobChanges: dict is ", jobData )
+        job_ref.set( jobData )
 
 
     def updateJobsList(self, jobs_ref ):
 
         newJobsList = []
         for jobRef in jobs_ref:
-            job = TKBuildJob.createFromFirebaseDict( jobRef.id, jobRef )
+            proj = self.projects[ jobRef.get('projectId') ]
+            job = TKBuildJob.createFromFirebaseDict( proj, jobRef.id, jobRef )
             newJobsList.append( job )
 
             # TODO; wrap log_struct with something that can log to console too
@@ -153,14 +157,14 @@ class TKBuildAgent(object):
         # testJob.worksteps = {"fetch": JobStatus.TODO,
         #                      "build": JobStatus.TODO }
 
-        testJob = TKBuildJob("tkwordlist")
-        testJob.commitVer = "05350960499b752bc13dd56144d6be8632ad82ca"
-        testJob.worksteps = {"fetch": JobStatus.TODO,
-                             "build": JobStatus.TODO}
-
-        print(f"Testjob: {testJob}")
-        testJobRef = db.collection(u'jobs').document()
-        testJobRef.set(testJob.toFirebaseDict())
+        # testJob = TKBuildJob("tkwordlist")
+        # testJob.commitVer = "05350960499b752bc13dd56144d6be8632ad82ca"
+        # testJob.worksteps = {"fetch": JobStatus.TODO,
+        #                      "build": JobStatus.TODO}
+        #
+        # print(f"Testjob: {testJob}")
+        # testJobRef = db.collection(u'jobs').document()
+        # testJobRef.set(testJob.toFirebaseDict())
 
         # Run the mainloop
         while not self.serverDone:
@@ -168,7 +172,7 @@ class TKBuildAgent(object):
             print("update ...")
             self.serverUpdate()
 
-            self.changeEvent.wait( 1.0  ) # TODO: make timeout an option
+            self.changeEvent.wait( 1.0  ) # TODO: make timeout time an option
             self.changeEvent.clear()
 
     def serverUpdate(self):
@@ -220,9 +224,9 @@ class TKBuildAgent(object):
         for wsdef in proj.workstepDefs:
             if not foundFailedStep and wsdef.stepname == wsdefFailed.stepname:
                 foundFailedStep = True
-                job.worksteps[ wsdef.stepname ] = JobStatus.FAIL
+                job.setWorkstepStatus( wsdef.stepname, JobStatus.FAIL )
             elif foundFailedStep and job.worksteps[ wsdef.stepname ] == JobStatus.TODO:
-                job.worksteps[wsdef.stepname] = JobStatus.CANCEL
+                job.setWorkstepStatus(wsdef.stepname, JobStatus.CANCEL)
 
         self.commitJobChanges( job )
 
@@ -238,7 +242,7 @@ class TKBuildAgent(object):
                     (job.worksteps[wsdef.stepname] == JobStatus.TODO)):
 
                 # Mark this workstep as running
-                job.worksteps[wsdef.stepname] = JobStatus.RUN
+                job.setWorkstepStatus(wsdef.stepname, JobStatus.RUN)
                 self.commitJobChanges( job )
 
                 # Open a logfile for this workstep
@@ -252,10 +256,12 @@ class TKBuildAgent(object):
                     # Treat 'fetch' specially for now
                     if wsdef.stepname == 'fetch':
                         if not self.workstepFetch( job, wsdef, fpLog ):
+                            logging.warning("fetch workstep FAILED.")
                             # The fetch failed for some reason, fail the workstep
                             self.failJob( job, wsdef )
                         else:
-                            job.worksteps[wsdef.stepname] = JobStatus.DONE
+                            logging.info("fetch succeeded, marking as DONE")
+                            job.setWorkstepStatus(wsdef.stepname, JobStatus.DONE)
                             self.commitJobChanges(job)
 
                         break
@@ -278,8 +284,7 @@ class TKBuildAgent(object):
                         else:
                             logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
 
-
-                        job.worksteps[wsdef.stepname] = JobStatus.DONE
+                        job.setWorkstepStatus(wsdef.stepname, JobStatus.DONE )
                         self.commitJobChanges(job)
 
                         break

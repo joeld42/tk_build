@@ -5,29 +5,71 @@
 {% endblock %}
 
 {% block content %}
+
 <div class="row">
     <h2>Active Jobs</h2>
 </div>
+<div class="row pt-2 border-top border-secondary border-3">
 
 <div class="row">
 {% for job in jobs %}
+    {% if job.activeStatus()=='active' %}
+    {% set has_active = True %}
 
-              <div class="card" style="width: 18rem;">
-                <h5 class="card-header">{{ job.projectId }}_{{ job.jobKey }}</h5>
-                <div class="card-body">
-                  <h5 class="card-title">{{ job.id }}</h5>
-                  <p class="card-text">Build from commit {{ job.commitVer }}</p>
-                    Steps:
-                    {% for ws in wsnames %}
-                      <span class="badge rounded-pill {{ wsstyles[ job.worksteps[ws] ] }}">{{ ws }}</span>
-                    {% endfor %}
+    <div class="card" style="width: 18rem;" >
+            <div class="card-header">
+                <p class="h4">{{ job.projectId }}-{{ job.platform }}</p>
+                <p><small>{{ job.jobKey }}</small></p>
+            </div>
 
-                  <a href="#" class="btn btn-primary">Go somewhere</a>
-                </div>
-              </div>
+            <div class="card-body">
 
+              <p>Build from commit {{ job.commitVer }}</p>
+                <p>Steps:
+                {% for ws in job.wsnames %}
+                  <span class="badge rounded-pill {{ wsstyles[ job.worksteps[ws] ] }}">{{ ws }}</span>
+                {% endfor %}
+                </p>
+
+              <!-- a href="#" class="btn btn-primary">Go somewhere</a -->
+            </div>
+
+          <div class="card-footer text-muted">
+              <a href="{{ url_for('del_job', jobkey=job.jobKey ) }}" class="btn btn-sm btn-danger" role="button">DEL</a>
+              <a href="#link" class="btn btn-sm btn-secondary" role="button">Logs</a>
+          </div>
+    </div>
+    {% endif %}
 {% endfor %}
+
+    {% if not has_active %}
+    <h1 class="display-6 fw-lighter">No Active Jobs</h1>
+    {% endif %}
+
 </div>
+
+<div class="row">
+<h2>Completed Jobs</h2>
+</div>
+<div class="row pt-2 border-top border-secondary border-3">
+
+<div class="row">
+    {% for job in jobs %}
+        {% if job.activeStatus()!='active' %}
+        <div class="card" style="width: 18rem;" >
+            <div class="card-body">
+                <p class="h6">{{ job.projectId }}-{{ job.platform }}</p>
+                <p><em>{{ job.jobKey }}</em></p>
+                <p><small>{{ job.worksteps }}</small></p>
+                <a href="{{ url_for('del_job', jobkey=job.jobKey ) }}" class="btn btn-sm btn-danger" role="button">DEL</a>
+                <a href="#" class="btn btn-sm btn-secondary" role="button">Details</a>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+
+
 
 <div class="row pt-2 mt-5 border-top border-primary border-3">
 <h2>Add Test Job</h2>
@@ -48,12 +90,26 @@
       <div class="col-sm-7">
           <input name="commit" class="form-control" list="commitDataList" id="sel-commit" placeholder="Enter Commit Hash...">
             <datalist id="commitDataList">
-                <option value="cbb4de3 put the line back">
-                <option value="105f08c deleted the line">
-                <option value="8af8b83 Added an important line">
-                <option value="c0dab64 changed stuff">
-                <option value="f6bb9ef Added somefile">
-                <option value="8571f73 Initial commit">
+
+                <option value="0535096 [tkwordlist] (HEAD -> master, origin/master, origin/HEAD) Added 'kakistocracy'">
+                <option value="4ddf800 [tkwordlist] Remove wordlist test dump from the sample file">
+                <option value="c061eaa [tkwordlist] Fix subtree bugs and add some documentation">
+                <option value="c238832 [tkwordlist] Initial commit, still needs cleanup and readme">
+                <option value="046c29b [tkwordlist] Initial commit">
+
+
+                <option value="cbb4de3 [testrepo] put the line back">
+                <option value="105f08c [testrepo] deleted the line">
+                <option value="8af8b83 [testrepo] Added an important line">
+                <option value="c0dab64 [testrepo] changed stuff">
+                <option value="f6bb9ef [testrepo] Added somefile">
+
+                <option value="e00f0c6 [civclicker] (HEAD -> master, origin/master, origin/HEAD) Add gamedata resources into cmake project">
+                <option value="206c7f9 [civclicker] Merge branch 'master' of https://github.com/joeld42/civclicker">
+                <option value="e8eb182 [civclicker] Fixes for xcode/cmake build">
+                <option value="0111635 [civclicker] Windows build fixes">
+                <option value="c6d9d42 [civclicker] misc updates">
+
             </datalist>
         </div>
 
@@ -65,7 +121,7 @@
             <h4>Worksteps:</h4>
         </div>
 
-        {% for ws in wsnames %}
+        {% for ws in allwsnames %}
         <div class="form-check col-sm-1">
           <input name="wscheck-{{ws}}" class="form-check-input" type="checkbox" value="todo" id="wscheck-{{ws}}" checked>
           <label class="form-check-label" for="wscheck-{{ws}}">
