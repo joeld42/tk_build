@@ -41,7 +41,6 @@ class TKBuildJob(object ):
                 status = self.worksteps[stepname]
                 if status == JobStatus.TODO:
                     return True
-
         return False
 
     def setWorkstepStatus(self, workstep, status ):

@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Register{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <h2>Active Jobs</h2>
+</div>
+
+<div class="row">
+{% for job in jobs %}
+
+              <div class="card" style="width: 18rem;">
+                <h5 class="card-header">{{ job.projectId }}_{{ job.jobKey }}</h5>
+                <div class="card-body">
+                  <h5 class="card-title">{{ job.id }}</h5>
+                  <p class="card-text">Build from commit {{ job.commitVer }}</p>
+                    Steps:
+                    {% for ws in wsnames %}
+                      <span class="badge rounded-pill {{ wsstyles[ job.worksteps[ws] ] }}">{{ ws }}</span>
+                    {% endfor %}
+
+                  <a href="#" class="btn btn-primary">Go somewhere</a>
+                </div>
+              </div>
+
+{% endfor %}
+</div>
+
+<div class="row pt-2 mt-5 border-top border-primary border-3">
+<h2>Add Test Job</h2>
+<form method="post" action="{{ url_for('add_job') }}">
+
+  <div class="mb-3 row">
+
+        <label for="sel-project" class="col-sm-1 col-form-label">Project</label>
+        <div class="col-sm-3">
+          <select name="project" id="sel-project" class="form-select" aria-label="Project Select">
+              {% for proj in agent.projects.values() %}
+                <option value="{{ proj.projectId}}" {% if proj.projectId=="testrepo" %}selected{% endif %} >{{ proj.projectId }}</option>
+              {% endfor %}
+            </select>
+        </div>
+
+      <label for="sel-commit" class="col-sm-1 col-form-label">Commit</label>
+      <div class="col-sm-7">
+          <input name="commit" class="form-control" list="commitDataList" id="sel-commit" placeholder="Enter Commit Hash...">
+            <datalist id="commitDataList">
+                <option value="cbb4de3 put the line back">
+                <option value="105f08c deleted the line">
+                <option value="8af8b83 Added an important line">
+                <option value="c0dab64 changed stuff">
+                <option value="f6bb9ef Added somefile">
+                <option value="8571f73 Initial commit">
+            </datalist>
+        </div>
+
+      </div>
+
+    <div class="mb-3 row">
+
+        <div class="col-sm-2">
+            <h4>Worksteps:</h4>
+        </div>
+
+        {% for ws in wsnames %}
+        <div class="form-check col-sm-1">
+          <input name="wscheck-{{ws}}" class="form-check-input" type="checkbox" value="todo" id="wscheck-{{ws}}" checked>
+          <label class="form-check-label" for="wscheck-{{ws}}">
+            {{ ws }}
+          </label>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3 row">
+        <div class="col-sm-4">
+        <button type="submit" class="btn btn-primary">Add Job</button>
+        </div>
+    </div>
+    <!--
+  <div class="mb-3 row">
+    <label for="inputPassword" class="col-sm-2 col-form-label">Password</label>
+    <div class="col-sm-10">
+      <input type="password" class="form-control" id="inputPassword">
+    </div>
+  </div>
+      -->
+
+</form>
+</div>
+{% endblock %}
