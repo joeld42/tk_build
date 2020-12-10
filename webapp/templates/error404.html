@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Register{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+<div class="row">
+    <h2>Page not found.</h2>
+</div>
+<div class="row pt-2 border-top border-danger border-3">
+    <p>Could not find that page.</p>
+    <p><em>{{ description }}</em> </p>
+    <p><a href="{{ url_for('index') }}">Back to TKBuild</a></p>
+    <p>TODO: put a cute animation here.</p>
+</div>
+{% endblock %}

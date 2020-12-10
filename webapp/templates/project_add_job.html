@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Add Job{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+<div class="row">
+    <h2>{{ project.projectId }} -- Add Job</h2>
+</div>
+<div class="row pt-2 border-top border-secondary border-3">
+
+    <form method="post" action="{{ url_for('project_add_job', project_id=project.projectId ) }}">
+
+  <div class="mb-3 row">
+
+      <label for="pr-addjob-commit-{{ project.projectId }}" class="col-sm-1 col-form-label">Commit</label>
+      <div class="col-sm-7">
+          <input name="commit" class="form-control" list="commitDataList-{{ project.projectId }}" id="pr-addjob-commit-{{ project.projectId }}" placeholder="Enter Commit Hash...">
+            <datalist id="commitDataList-{{ project.projectId }}">
+                {% for commit in commits %}
+                    <option value="{{ commit }}">
+                {% endfor %}
+            </datalist>
+        </div>
+
+      </div>
+
+    <div class="mb-3 row">
+
+        <div class="col-sm-2">
+            <h4>Worksteps:</h4>
+        </div>
+
+        {% for ws in wsnames %}
+        <div class="form-check col-sm-1">
+          <input name="wscheck-{{ws}}" class="form-check-input" type="checkbox" value="todo" id="wscheck-{{ws}}" checked>
+          <label class="form-check-label" for="wscheck-{{ws}}">
+            {{ ws }}
+          </label>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mb-3 row">
+        <div class="col-sm-4">
+        <button type="submit" class="btn btn-primary">Add Job</button>
+        </div>
+    </div>
+
+</form>
+
+
+</div>
+{% endblock %}

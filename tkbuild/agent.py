@@ -188,6 +188,12 @@ class TKBuildAgent(object):
 
             proj = self.projects[job.projectId]
 
+            # DBG: If the job is marked "running" something is wrong bc
+            # for now we're the only agent
+            if JobStatus.RUN in job.worksteps.values():
+                logging.error("Job is marked RUN?? but we're not running it.")
+                sys.exit(1)
+
             # If the job has work left to do
             if job.hasWorkRemaining( proj.workstepNames ):
                 print("job ", job, "has work left...")
@@ -289,6 +295,32 @@ class TKBuildAgent(object):
 
                         break
 
+    def makePristineRepoPath(self, proj ):
+        pristineRepoPath = os.path.join(proj.projectDir, proj.projectId + "_pristine")
+        return pristineRepoPath
+
+    def getRecentCommits(self, proj ):
+        pristineRepoPath = self.makePristineRepoPath( proj)
+        if not os.path.exists(pristineRepoPath):
+            # Don't implicitly pull the repo here
+            return []
+
+        gitCmd = ["git",
+                  "-C",  pristineRepoPath,
+                  "log", "--oneline", "--no-decorate", "-n","20"
+                  ]
+        print( "gitCmd is ", gitCmd )
+        result = subprocess.run( gitCmd, capture_output=True )
+        if result.returncode:
+            return [ "ERROR in git log" ]
+        else:
+            commitList = []
+            for line in result.stdout.decode("utf-8").split("\n"):
+                if line:
+                    commitList.append( line )
+            return commitList
+
+
     # I don't like this workstep being hardcoded in the agent but not sure exactly
     # how I want it to look so I'm putting it here for now.
     def workstepFetch(self, job, wsdef, fpLog ):
@@ -296,7 +328,7 @@ class TKBuildAgent(object):
         proj = self.projects[job.projectId]
 
         # see if the "pristine repo" exists
-        pristineRepoPath = os.path.join( proj.projectDir, proj.projectId + "_pristine" )
+        pristineRepoPath = self.makePristineRepoPath( self, proj )
         if not os.path.exists( pristineRepoPath ):
             logging.info(f"Cloning pristine repo {pristineRepoPath}")
             gitCmd = [ "git", "clone", wsdef.repoUrl, pristineRepoPath ]
