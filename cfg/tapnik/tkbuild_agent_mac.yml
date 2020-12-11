@@ -1,0 +1,44 @@
+---
+# Config file for tkbuild worker/agent node
+build-agent:
+  name: obelisk
+  desc: Joel main dev laptop
+  gcloud:
+    credfile: /Users/joeld/stuff/firebasetest/firestore-key.json
+    project-id: rising-environs-295900
+  
+projects:
+
+  - project:
+      projectId: tkwordlist
+      projectDir: "/opt/tkbuild/tk_wordlist/"
+      workDir: "/opt/tkbuild/tk_wordlist/workdir"
+      repoUrl: "https://github.com/joeld42/tk_wordlist.git"
+      icon: "/imgs/icon_tkwordlist_167.png"
+      worksteps:
+        - name: "fetch"
+          repoUrl: "https://github.com/joeld42/tk_wordlist.git"          
+        - name: "build"
+          cmd: "$TKBUILD/tkwordlist_build.sh $WORKDIR"
+
+  - project:
+      projectId: testrepo
+      projectDir: "/opt/tkbuild/testrepo/"
+      repoUrl: "https://github.com/joeld42/testrepo.git"
+      icon: "/imgs/icon_testrepo_167.png"
+      bucketName: tkbuild-artifacts
+      worksteps:
+        - name: "fetch"
+          repoUrl: "https://github.com/joeld42/testrepo.git"
+          cmd: "echo will do extra fetch stuff here"
+        - name: "build"
+          cmd: "$TKBUILD/testrepo_build.sh $WORKDIR"
+        - name: "package"
+          cmd: "$TKBUILD/testrepo_package.sh $WORKDIR"
+          artifact: "$WORKDIR/testrepo_pkg.zip"
+
+  - project:
+      projectId: civclicker
+      projectDir: "/opt/tkbuild/civclicker"
+      repoUrl: "https://github.com/joeld42/testrepo.git"
+      icon: "/imgs/icon_civclicker_167.png"
