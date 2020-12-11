@@ -4,14 +4,15 @@ import os, sys
 from flask import Flask, render_template, redirect, url_for, request, abort
 
 app = Flask("tk_build",
-                template_folder="./webapp/templates",
-                static_folder="./webapp/static")
+            template_folder="./webapp/templates",
+            static_folder="./webapp/static/")
 
 
 from tkbuild.agent import TKBuildAgent
 from tkbuild.cloud import connectCloudStuff
 from tkbuild.job import TKBuildJob, TKWorkstepDef
 from tkbuild.project import TKBuildProject
+from tkbuild.artifact import TKArtifact
 
 import logging
 
@@ -19,7 +20,10 @@ agent = None
 
 @app.route('/')
 def index():
-    return render_template('base.html')
+
+    projs = agent.projects.values()
+
+    return render_template('index.html', projects=projs, active='projects' )
 
 @app.route('/jobs')
 def jobs_overview():
@@ -44,13 +48,35 @@ def jobs_overview():
             if not wsdef.stepname in allwsnames:
                 allwsnames.append( wsdef.stepname )
 
-    return render_template('jobs.html', jobs=jobs, wsstyles=wsstyles, agent=agent, allwsnames = allwsnames )
+    return render_template('jobs.html', jobs=jobs, projects=agent.projects.keys(),
+                           wsstyles=wsstyles, agent=agent, allwsnames = allwsnames,
+                           active='jobs')
 
 @app.route('/del_job/<jobkey>' )
 def del_job( jobkey ):
 
     agent.db.collection(u'jobs').document( jobkey ).delete()
     return redirect(url_for('jobs_overview'))
+
+@app.route('/builds')
+def builds_overview():
+
+    # Fetch the build artifacts
+    artifacts = {}
+    artifactsData = agent.db.collection(u'artifacts').get()
+    for artifactData in artifactsData:
+
+        print( "ArtifactData is ", artifactData.to_dict() )
+
+        artifact = TKArtifact.createFromFirebaseDict( artifactData.id, artifactData )
+        if not artifact.project in artifacts:
+            artifacts[ artifact.project ] = []
+
+        artifacts[artifact.project].append( artifact )
+
+    print("All Artifacts", artifacts)
+
+    return render_template('builds.html', projects=agent.projects.values(), artifacts=artifacts, active='builds' )
 
 @app.route('/project/<project_id>' )
 def project_overview( project_id ):

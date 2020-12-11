@@ -1,10 +1,20 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Register{% endblock %}</h1>
+  <h1>{% block title %}Jobs Overview{% endblock %}</h1>
 {% endblock %}
 
 {% block content %}
+
+<div class="row">
+    <p> New Job:
+    {% for p in projects %}
+        <a href="{{ url_for('project_add_job', project_id=p ) }}">
+            <button type="button" class="btn btn-primary">+ {{ p }}</button>
+        </a>
+    {% endfor %}
+    </p>
+</div>
 
 <div class="row">
     <h2>Active Jobs</h2>
@@ -22,6 +32,11 @@
     <div class="card" style="width: 18rem;" >
             <div class="card-header">
                 <p class="h4">{{ job.projectId }}-{{ job.platform }}</p>
+                <p>
+                    <span class="badge bg-danger">Errors: {{ job.errorCount }}</span>
+                    <span class="badge bg-warning text-dark">Warnings: {{ job.warnCount }}</span>
+                </p>
+
                 <p><small>{{ job.jobKey }}</small></p>
             </div>
 
@@ -44,7 +59,7 @@
     </div>
     {% endif %}
 {% endfor %}
-    
+
     {% if not has_active.flag %}
     <h1 class="display-6 fw-lighter">No Active Jobs</h1>
     {% endif %}
@@ -60,10 +75,21 @@
     {% for job in jobs %}
         {% if job.activeStatus()!='active' %}
         <div class="card" style="width: 18rem;" >
+            {% if job.activeStatus() == 'done' %}
+            <div class="card-header bg-success text-white">
+            {% elif job.activeStatus() == 'fail' %}
+            <div class="card-header bg-secondary text-white">
+            {% endif %}
+            <p class="h6">{{ job.projectId }}-{{ job.platform }}
+                {% if job.errorCount %}<span class="badge bg-danger">{{ job.errorCount }}</span>{% endif %}
+                {% if job.warnCount %}<span class="badge bg-warning text-dark">{{ job.warnCount }}</span>{% endif %}
+                </p>
+            </div>
+
             <div class="card-body">
-                <p class="h6">{{ job.projectId }}-{{ job.platform }}</p>
+
                 <p><em>{{ job.jobKey }}</em></p>
-                <p><small>{{ job.worksteps }}</small></p>
+                {# <p><small>{{ job.worksteps }}</small></p> #}
                 <a href="{{ url_for('del_job', jobkey=job.jobKey ) }}" class="btn btn-sm btn-danger" role="button">DEL</a>
                 <a href="#" class="btn btn-sm btn-secondary" role="button">Details</a>
             </div>

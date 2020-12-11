@@ -14,11 +14,13 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 
 
+import google.cloud.storage
 import google.cloud.logging
 import logging
 
 from tkbuild.job import TKBuildJob, TKWorkstepDef, JobStatus
 from tkbuild.project import TKBuildProject
+from tkbuild.artifact import TKArtifact
 
 class TKBuildAgentConfig(object):
 
@@ -59,6 +61,7 @@ class TKBuildAgent(object):
         self.platform = platform.system() # e.g. "Darwin"
         self.serverDone = False
         self.updCount = 0 # mostly for debugging
+        self.storage_client = None
 
         self.db = None
         self.jobList = [] # Will be populated from the jobs callback
@@ -99,7 +102,6 @@ class TKBuildAgent(object):
         job_ref = self.jobs_ref.document( job.jobKey )
 
         jobData = job.toFirebaseDict()
-        print("CommitJobChanges: dict is ", jobData )
         job_ref.set( jobData )
 
 
@@ -188,11 +190,12 @@ class TKBuildAgent(object):
 
             proj = self.projects[job.projectId]
 
-            # DBG: If the job is marked "running" something is wrong bc
-            # for now we're the only agent
+            # Ignore jobs marked "RUN" ... this might be running on another node (todo) but
+            # probably is just stale because firebase updates are not instant.
             if JobStatus.RUN in job.worksteps.values():
-                logging.error("Job is marked RUN?? but we're not running it.")
-                sys.exit(1)
+                logging.warning("Job is marked RUN?? but we're not running it.")
+                #sys.exit(1)
+                continue
 
             # If the job has work left to do
             if job.hasWorkRemaining( proj.workstepNames ):
@@ -221,7 +224,7 @@ class TKBuildAgent(object):
 
     def failJob(self, job, wsdefFailed ):
 
-        logging.error( f"Job {job.jobKey} failed.")
+        logging.error( f"Job {job.jobKey}:{wsdefFailed.stepname} failed.")
 
         # Go through the worksteps until we find the one that failed.
         # Mark it as failed, and any subsequent ones as cancelled
@@ -236,6 +239,51 @@ class TKBuildAgent(object):
 
         self.commitJobChanges( job )
 
+    def replacePathVars(self, origPath, workdirRepoPath ):
+
+        result = origPath.replace("$TKBUILD", self.tkbuildDir)
+        result = result.replace("$WORKDIR", workdirRepoPath)
+
+        return result
+
+    def publishArtifact( self, proj, job, wsdef, workdirRepoPath ):
+
+        # Check that we're configured to publish stuff
+        if not proj.bucketName:
+            logging.warning("publishArtifact: No bucketName set in project, can't publish.")
+            return False
+
+        # Make sure the file exists
+        artifactFile = wsdef.artifact
+        artifactFile = self.replacePathVars( artifactFile, workdirRepoPath )
+        if not os.path.exists( artifactFile ):
+            logging.warning( f"Artifact file {artifactFile} does not exist.")
+            return False
+        else:
+            logging.info( f"Publishing {artifactFile} to bucket {proj.bucketName}")
+            if self.storage_client is None:
+                self.storage_client = google.cloud.storage.Client()
+
+            artifactFileName = os.path.split( artifactFile )[-1]
+            bucket = self.storage_client.bucket( proj.bucketName )
+            blobName = os.path.join( proj.projectId, job.jobKey, artifactFileName)
+            blob = bucket.blob( blobName )
+            result = blob.upload_from_filename( artifactFile )
+
+            artifactUrl = f"https://storage.googleapis.com/{bucket.name}/{blob.name}"
+            logging.info( f"Result of upload is {artifactUrl}")
+
+            # Make an artifact entry in the DB
+            artifact = TKArtifact( proj )
+            artifact.commitVer = job.commitVer
+            artifact.jobKey = job.jobKey
+            artifact.builtfile = artifactUrl
+
+            pubArtifactRef = self.db.collection(u'artifacts').document()
+            pubArtifactRef.set( artifact.toFirebaseDict() )
+            logging.info( f"Added artifact with ref {pubArtifactRef.id}")
+
+            return True
 
     def runNextJobStep(self, job ):
 
@@ -272,6 +320,7 @@ class TKBuildAgent(object):
 
                         break
                     else:
+                        # Regular workstep
                         logging.info( f"Will do job step {wsdef.stepname}" )
                         workdirRepoPath = os.path.join(proj.workDir, job.jobDirShort)
                         if wsdef.cmd:
@@ -281,17 +330,31 @@ class TKBuildAgent(object):
                             for stepCmdSplit in wsdef.cmd.split():
 
                                 # Replace the project dirs
-                                stepCmdSplit = stepCmdSplit.replace( "$TKBUILD", self.tkbuildDir )
-                                stepCmdSplit = stepCmdSplit.replace( "$WORKDIR", workdirRepoPath )
+                                stepCmdSplit = self.replacePathVars( stepCmdSplit, workdirRepoPath )
 
                                 stepCmd.append( stepCmdSplit )
 
-                            result, cmdTime = self.echoRunCommand( stepCmd, fpLog )
+                            result, cmdTime = self.echoRunCommand( stepCmd, fpLog, self, job )
                         else:
                             logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
+                            result = 0 # treat as done
+                            cmdTime = datetime.timedelta(0)
 
-                        job.setWorkstepStatus(wsdef.stepname, JobStatus.DONE )
-                        self.commitJobChanges(job)
+                        if result == 0:
+                            # Did succeed?
+                            logging.info(f"Workstep {job.projectId}:{wsdef.stepname} completed success.")
+                            job.setWorkstepStatus(wsdef.stepname, JobStatus.DONE )
+                            self.commitJobChanges(job)
+
+                            # If this workstep made an artifact that should get published, do so
+                            logging.info( f"wsdef artifact is {wsdef.artifact}")
+                            if wsdef.artifact:
+                                if not self.publishArtifact( proj, job, wsdef, workdirRepoPath ):
+                                    self.failJob( job, wsdef )
+
+                        else:
+                            # Step failed, fail the whole job :_(
+                            self.failJob( job, wsdef )
 
                         break
 
@@ -328,7 +391,7 @@ class TKBuildAgent(object):
         proj = self.projects[job.projectId]
 
         # see if the "pristine repo" exists
-        pristineRepoPath = self.makePristineRepoPath( self, proj )
+        pristineRepoPath = self.makePristineRepoPath( proj )
         if not os.path.exists( pristineRepoPath ):
             logging.info(f"Cloning pristine repo {pristineRepoPath}")
             gitCmd = [ "git", "clone", wsdef.repoUrl, pristineRepoPath ]
@@ -373,7 +436,8 @@ class TKBuildAgent(object):
                 break
             yield line
 
-    def echoRunCommand( self, command, fpLog ):
+    def echoRunCommand( self, command, fpLog, agent = None, job = None ):
+
         """returns ( returnValue, timeTaken) """
         cmdStr = " ".join(command)
         fpLog.write( "CMD: " + cmdStr + "\n")
@@ -397,17 +461,33 @@ class TKBuildAgent(object):
             isWarn = False
 
             # FIXME: Better parsing here, also make it tool-aware
-            if line.startswith( "fatal:") or line.startswith( "error:" ):
+            if line.find( "fatal:") >= 0 or line.find( "error:" ) >= 0:
                 isError = True
+            elif line.find("warning:") >= 0:
+                isWarn = True
 
             if isError:
                 logging.error(line)
                 fpLog.write( "ERROR: "+ line + "\n")
                 fpLog.flush()
+
+                if job:
+                    job.countError()
+
+            elif isWarn:
+                logging.warning(line)
+                fpLog.write("WARN: " + line + "\n")
+                fpLog.flush()
+                if job:
+                    job.countWarning()
+
             else:
                 logging.info( line )
                 fpLog.write( line + "\n")
                 fpLog.flush()
+
+            if (isError or isWarn) and (agent and job):
+                agent.commitJobChanges( job )
 
         process.wait()
 

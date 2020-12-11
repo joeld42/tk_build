@@ -6,6 +6,13 @@ import logging
 from tkbuild.agent import TKBuildAgent
 from tkbuild.cloud import connectCloudStuff
 
+# TODOs to work on with dave:
+# - Use google org authentication for bucket files
+# - Generate link to jump to log or bucket in cloud console easily from tkbuild_web
+# - Embed log view (query log directly?)
+# - Tag/search log entries by job/workstep as well as just agent
+
+
 if __name__=='__main__':
 
     # TODO get this from environment or args

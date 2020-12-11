@@ -5,6 +5,7 @@ class TKWorkstepDef(object):
     def __init__(self):
         self.stepname = "unknown"
         self.cmd = ""
+        self.artifact = None
 
 class JobStatus( str, Enum ):
     TODO = 'todo'
@@ -56,6 +57,14 @@ class TKBuildJob(object ):
             wsnames.append( wsdef.stepname )
 
         self.wsnames = wsnames
+
+    def countError(self):
+        self.errorCount += 1
+        logging.info( f"Errorcount bumped, is now {self.errorCount}")
+
+    def countWarning(self):
+        self.warnCount += 1
+        logging.info(f"Warncount bumped, is now {self.warnCount}")
 
     def isActive(self):
         return self.activeStatus() == ActiveStatus.ACTIVE

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}TKBuild Projects{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+{% for proj in projects %}
+    <div class="row pt-2 pb-2 border-top border-bottom border-secondary border-3">
+        <div class="col-sm-2">
+            {% if proj.icon %}
+            <img src="{{ proj.icon }}" width="167" height="167" class="figure-img img-fluid rounded">
+            {% else %}
+            <div class="rounded display-6" style="color: #eeffee; display:flex; align-items: center; justify-content: center;  width: 167px; height: 167px; background: linear-gradient(0deg, rgba(18,110,19,1) 0%, rgba(133,193,17,1) 64%, rgba(146,252,69,1) 100%);"> {{ proj.projectId }} </div>
+            {% endif %}
+        </div>
+        <div class="col-lg-10">
+            <p class="h2">{{ proj.projectId }}</p>
+            <a href="{{ proj.repoUrl }}"><p class="font-monospace">{{ proj.repoUrl }}</p></a>
+            <p><em>Build Status:</em> <span class="badge bg-success">Todo</span></p>
+            <p><em>Latest Build: </em><a href="#">v?.?.?</a></p>
+        </div>
+
+    </div>
+{% endfor %}
+
+{% endblock %}

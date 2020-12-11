@@ -24,6 +24,8 @@ class TKBuildProject(object):
         self.projectDir = os.path.join( "/opt/tkbuild/", self.projectId )
         self.workDir = None
         self.repoUrl = None
+        self.icon = None
+        self.bucketName = None
 
         # Now fill in some computed defaults if some things aren't specified
         if self.workDir is None:
@@ -37,6 +39,9 @@ class TKBuildProject(object):
         proj.projectId = configData.get( "projectId", proj.projectId )
         proj.projectDir = configData.get( "projectDir", proj.projectDir )
         proj.repoUrl = configData.get( "repoUrl", "MISSING-REPO-URL" )
+        proj.icon = configData.get("icon" )
+        proj.bucketName = configData.get( "bucketName" )
+
         if 'workDir' in configData:
             proj.workDir = configData['workDir']
         else:
@@ -49,6 +54,8 @@ class TKBuildProject(object):
                 step.cmd = stepdef.get('cmd', '' )
                 if step.stepname=='fetch':
                     step.repoUrl = stepdef.get( 'repoUrl', '' )
+
+                step.artifact = stepdef.get('artifact', None )
 
                 proj.workstepDefs.append( step )
 
