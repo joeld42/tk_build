@@ -174,7 +174,7 @@ class TKBuildAgent(object):
             print("update ...")
             self.serverUpdate()
 
-            self.changeEvent.wait( 1.0  ) # TODO: make timeout time an option
+            self.changeEvent.wait( 5.0  ) # TODO: make timeout time an option
             self.changeEvent.clear()
 
     def serverUpdate(self):
@@ -182,11 +182,11 @@ class TKBuildAgent(object):
         logging.info( f"Agent update ... {self.updCount}")
         self.updCount += 1
 
-        logging.info( f" {len(self.jobList)} avail jobs:")
+        print( f" {len(self.jobList)} avail jobs:")
 
         # Check if there are any jobdirs that do not exist in the job list. If so, clean up those job dirs.
         for job in self.jobList:
-            logging.info( f"JOB: {job.jobKey} steps: {job.worksteps} ")
+            print( f"JOB: {job.jobKey} steps: {job.worksteps} ")
 
             proj = self.projects[job.projectId]
 
@@ -274,7 +274,8 @@ class TKBuildAgent(object):
             logging.info( f"Result of upload is {artifactUrl}")
 
             # Make an artifact entry in the DB
-            artifact = TKArtifact( proj )
+            artifact = TKArtifact()
+            artifact.project = proj.projectId
             artifact.commitVer = job.commitVer
             artifact.jobKey = job.jobKey
             artifact.builtfile = artifactUrl
