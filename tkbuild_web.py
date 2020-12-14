@@ -7,6 +7,8 @@ app = Flask("tk_build",
             template_folder="./webapp/templates",
             static_folder="./webapp/static/")
 
+from flask.logging import default_handler
+app.logger.removeHandler(default_handler)
 
 from tkbuild.agent import TKBuildAgent
 from tkbuild.cloud import connectCloudStuff

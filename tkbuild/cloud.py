@@ -34,13 +34,12 @@ def connectCloudStuff( agent ):
 
     cred = credentials.Certificate( os.environ.get( credKey ) )
     firebase_admin.initialize_app(cred, {
-      #'projectId': 'rising-environs-295900',
         'projectId' : agent.googleProjectId
     })
     db = firestore.client()
 
     # Initialize logging
-    do_cloud_logging = True
+    do_cloud_logging = False
     if do_cloud_logging:
         # logger = logging_client.logger("tkbuild-agent-" + agent.name )
         logging_client = google.cloud.logging.Client( )
@@ -49,16 +48,21 @@ def connectCloudStuff( agent ):
     else:
         logging.basicConfig( level=logging.INFO )
 
-    # logging.debug("log debug")
-    # logging.info("log info")
-    # logging.warning("log warn")
-    # logging.error("log error")
+    logging.debug("log debug")
+    logging.info("log info")
+    logging.warning("log warn")
+    logging.error("log error")
 
 
     logging.info ( f"Agent: {agent.name}: {agent.desc}" )
     testRepoProj = None
     for p in agent.projects.values():
-        logging.info( f"Project: {p.projectId} -- {p.repoUrl}" )
+
+        fetchRepoUrl = "(No Fetch Step Defined)"
+        pfetch = p.getFetchWorkstep()
+        if pfetch:
+            fetchRepoUrl = pfetch.repoUrl
+        logging.info( f"Project: {p.projectId} -- {fetchRepoUrl}" )
 
     return db
 

@@ -23,7 +23,6 @@ class TKBuildProject(object):
         self.projectId = "noname"
         self.projectDir = os.path.join( "/opt/tkbuild/", self.projectId )
         self.workDir = None
-        self.repoUrl = None
         self.icon = None
         self.bucketName = None
 
@@ -38,7 +37,6 @@ class TKBuildProject(object):
         proj = cls()
         proj.projectId = configData.get( "projectId", proj.projectId )
         proj.projectDir = configData.get( "projectDir", proj.projectDir )
-        proj.repoUrl = configData.get( "repoUrl", "MISSING-REPO-URL" )
         proj.icon = configData.get("icon" )
         proj.bucketName = configData.get( "bucketName" )
 
@@ -66,3 +64,11 @@ class TKBuildProject(object):
         proj.workstepNames = wsnames
 
         return proj
+
+    def getFetchWorkstep(self):
+
+        for wsdef in self.workstepDefs:
+            if wsdef.stepname=='fetch':
+                return wsdef
+
+        return None

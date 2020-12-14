@@ -1,10 +1,10 @@
 ---
 # Config file for tkbuild worker/agent node
 build-agent:
-  name: obelisk
-  desc: Joel main dev laptop
+  name: pareidolia
+  desc: Joel macbook build agent
   gcloud:
-    credfile: /Users/joeld/stuff/firebasetest/firestore-key.json
+    credfile: /Users/joeld/cfg/firestore-key.json
     project-id: rising-environs-295900
   
 projects:
@@ -13,7 +13,6 @@ projects:
       projectId: tkwordlist
       projectDir: "/opt/tkbuild/tk_wordlist/"
       workDir: "/opt/tkbuild/tk_wordlist/workdir"
-      repoUrl: "https://github.com/joeld42/tk_wordlist.git"
       icon: "/imgs/icon_tkwordlist_167.png"
       worksteps:
         - name: "fetch"
@@ -24,7 +23,6 @@ projects:
   - project:
       projectId: testrepo
       projectDir: "/opt/tkbuild/testrepo/"
-      repoUrl: "https://github.com/joeld42/testrepo.git"
       icon: "/imgs/icon_testrepo_167.png"
       bucketName: tkbuild-artifacts
       worksteps:
@@ -40,5 +38,13 @@ projects:
   - project:
       projectId: civclicker
       projectDir: "/opt/tkbuild/civclicker"
-      repoUrl: "https://github.com/joeld42/testrepo.git"
       icon: "/imgs/icon_civclicker_167.png"
+      worksteps:
+        - name: "fetch"
+          repoUrl: "https://github.com/joeld42/civclicker.git"
+          cmd: "$TKBUILD/civclicker_fetch.sh $WORKDIR"
+        - name: "build"
+          cmd: "$TKBUILD/civclicker_build.sh $WORKDIR"
+        - name: "package"
+          cmd: "$TKBUILD/civclicker_package.sh $WORKDIR"
+          artifact: "$WORKDIR/civclicker_pkg.ipa"
