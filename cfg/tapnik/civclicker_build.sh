@@ -15,7 +15,10 @@ trap 'echo "\"${last_command}\" failed with exit code $?."' EXIT
 
 # Actual build steps here
 cd $1
+./fips set config metal-ios-xcode-release
 ./fips gen
 ./fips build
+
+
 
 

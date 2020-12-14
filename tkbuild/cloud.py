@@ -39,19 +39,31 @@ def connectCloudStuff( agent ):
     db = firestore.client()
 
     # Initialize logging
-    do_cloud_logging = False
+    do_cloud_logging = True
     if do_cloud_logging:
         # logger = logging_client.logger("tkbuild-agent-" + agent.name )
         logging_client = google.cloud.logging.Client( )
         logging_handler = google.cloud.logging.handlers.CloudLoggingHandler(logging_client, name="tkbuild-agent-" + agent.name )
         google.cloud.logging.handlers.setup_logging( logging_handler )
+
+        # Also echo to stdout
+        rootLogger = logging.getLogger()
+        #rootLogger.setLevel(logging.DEBUG)
+
+        stdoutHandler = logging.StreamHandler(sys.stdout)
+        #stdoutHandler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(levelname)s: %(message)s')
+        stdoutHandler.setFormatter(formatter)
+        rootLogger.addHandler(stdoutHandler)
+
     else:
+        # Just run with stdout logging for testing
         logging.basicConfig( level=logging.INFO )
 
-    logging.debug("log debug")
-    logging.info("log info")
-    logging.warning("log warn")
-    logging.error("log error")
+    # logging.debug("log debug")
+    # logging.info("log info")
+    # logging.warning("log warn")
+    # logging.error("log error")
 
 
     logging.info ( f"Agent: {agent.name}: {agent.desc}" )

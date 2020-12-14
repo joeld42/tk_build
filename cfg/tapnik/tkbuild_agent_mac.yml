@@ -39,6 +39,7 @@ projects:
       projectId: civclicker
       projectDir: "/opt/tkbuild/civclicker"
       icon: "/imgs/icon_civclicker_167.png"
+      bucketName: tkbuild-artifacts
       worksteps:
         - name: "fetch"
           repoUrl: "https://github.com/joeld42/civclicker.git"
@@ -47,4 +48,4 @@ projects:
           cmd: "$TKBUILD/civclicker_build.sh $WORKDIR"
         - name: "package"
           cmd: "$TKBUILD/civclicker_package.sh $WORKDIR"
-          artifact: "$WORKDIR/civclicker_pkg.ipa"
+          artifact: "$WORKDIR/export/civclicker.ipa"

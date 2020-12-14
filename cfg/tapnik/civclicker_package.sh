@@ -14,6 +14,13 @@ trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
 trap 'echo "\"${last_command}\" failed with exit code $?."' EXIT
 
 # Actual build steps here
-echo "TODO: will do publish step..."
+cd $1
+mkdir -p $1/export
+./fips set config metal-ios-xcode-release
+xcodebuild -project $1/../fips-build/${PWD##*/}/metal-ios-xcode-release/civclicker.xcodeproj \
+	-scheme civclicker -archivePath $1/civclicker_archive archive
 
+xcodebuild -exportArchive -archivePath $1/civclicker_archive.xcarchive \
+	-exportOptionsPlist /opt/tkbuild/civclickerExportOptions.plist \
+	-exportPath $1/export
 
