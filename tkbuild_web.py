@@ -88,6 +88,19 @@ def project_overview( project_id ):
 
     return
 
+@app.route('/project/<project_id>/refresh_repo' )
+def project_refresh_repo( project_id ):
+
+    proj = agent.projects.get( project_id )
+    if proj == None:
+        abort(404, description=f"Project '{project_id}' does not exist.")
+
+    wsdef = proj.getFetchWorkstep()
+    agent.updatePristineRepo( proj, wsdef, None )
+
+    return redirect(url_for('project_add_job', project_id=project_id) )
+
+
 @app.route('/project/<project_id>/add_job', methods=[ 'POST', 'GET'])
 def project_add_job( project_id ):
 

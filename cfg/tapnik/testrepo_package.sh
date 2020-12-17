@@ -1,7 +1,7 @@
 #!/bin/bash
-if [ -z "$1" ] 
+if [ "$#" -ne 3 ] 
 	then
-	echo "Use testrepo_package.sh <path_to_work_dir>"
+	echo "Use testrepo_package.sh <path_to_work_dir> <version> <build_num>"
 	exit 1
 fi
 
@@ -18,6 +18,6 @@ mkdir -p $1/testrepo
 cd $1
 cp build/puzzle3 testrepo/
 cp README.md testrepo/
-zip -r -X testrepo_pkg.zip testrepo
+zip -r -X testrepo_$2_build_$3.zip testrepo
 
 

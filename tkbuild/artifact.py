@@ -2,6 +2,8 @@ import os, sys
 from enum import Enum
 import logging
 
+from firebase_admin.firestore import SERVER_TIMESTAMP
+
 class TKArtifact(object ):
 
     def __init__(self, id = "0000000"):
@@ -10,6 +12,7 @@ class TKArtifact(object ):
         self.jobKey = None
         self.builtFile = None
         self.commitVer = None
+        self.timestamp = None
 
     def shortFilename(self):
 
@@ -21,6 +24,7 @@ class TKArtifact(object ):
             "jobKey" : self.jobKey,
             "commitVer" : self.commitVer,
             "builtFile" : self.builtfile,
+            "timestamp" : SERVER_TIMESTAMP if self.timestamp is None else self.timestamp
         }
 
     @classmethod
@@ -31,5 +35,6 @@ class TKArtifact(object ):
         artifact.project = dataDict.get('project' )
         artifact.commitVer = dataDict.get( 'commitVer' )
         artifact.builtFile = dataDict.get( 'builtFile' )
+        artifact.timestamp = dataDict.get( 'builtFile' )
 
         return artifact

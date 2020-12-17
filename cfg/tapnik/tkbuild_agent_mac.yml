@@ -30,10 +30,11 @@ projects:
           repoUrl: "https://github.com/joeld42/testrepo.git"
           cmd: "echo will do extra fetch stuff here"
         - name: "build"
-          cmd: "$TKBUILD/testrepo_build.sh $WORKDIR"
-        - name: "package"
-          cmd: "$TKBUILD/testrepo_package.sh $WORKDIR"
-          artifact: "$WORKDIR/testrepo_pkg.zip"
+          cmd: "$TKBUILD/testrepo_build.sh $WORKDIR $COMMIT $BUILDNUM"
+          peekVersion : "$WORKDIR/version.txt"
+        - name: "package"          
+          cmd: "$TKBUILD/testrepo_package.sh $WORKDIR $VERSION $BUILDNUM"
+          artifact: "$WORKDIR/testrepo_$VERSION_build_$BUILDNUM.zip"
 
   - project:
       projectId: civclicker
@@ -45,7 +46,8 @@ projects:
           repoUrl: "https://github.com/joeld42/civclicker.git"
           cmd: "$TKBUILD/civclicker_fetch.sh $WORKDIR"
         - name: "build"
-          cmd: "$TKBUILD/civclicker_build.sh $WORKDIR"
+          cmd: "$TKBUILD/civclicker_build.sh $WORKDIR $COMMIT $BUILDNUM"
+          peekVersion : "$WORKDIR/version.txt"
         - name: "package"
-          cmd: "$TKBUILD/civclicker_package.sh $WORKDIR"
-          artifact: "$WORKDIR/export/civclicker.ipa"
+          cmd: "$TKBUILD/civclicker_package.sh $WORKDIR $VERSION $BUILDNUM"
+          artifact: "$WORKDIR/export/civclicker_$VERSION_$BUILDNUM.ipa"

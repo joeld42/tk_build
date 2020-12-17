@@ -6,6 +6,7 @@ class TKWorkstepDef(object):
         self.stepname = "unknown"
         self.cmd = ""
         self.artifact = None
+        self.peekVersion = None
 
 class JobStatus( str, Enum ):
     TODO = 'todo'
@@ -35,6 +36,8 @@ class TKBuildJob(object ):
         self.logLink = ""
         self.githubJson = None
         self.jobDirShort = "nojobdir"
+        self.version = "0.0.0"
+        self.buildNum = 0
         self.worksteps = {
             "fetch" : JobStatus.TODO
         }
@@ -120,17 +123,24 @@ class TKBuildJob(object ):
             "warnCount" : self.warnCount,
             "logLink" : self.logLink,
             "githubJson" : self.githubJson,
-            "worksteps" : self.worksteps
+            "worksteps" : self.worksteps,
+            "version" : self.version,
+            "buildNum" : self.buildNum
         }
 
     @classmethod
-    def createFromFirebaseDict(cls, project, jobKey, jobDict ):
+    def createFromFirebaseDict(cls, project, jobKey, jobref ):
+
+        jobDict = jobref.to_dict()
 
         job = cls( project, jobKey )
         job.platform = jobDict.get( 'platform'  )
         job.commitVer = jobDict.get( 'commitVer' )
         job.errorCount = jobDict.get( 'errorCount' )
         job.warnCount = jobDict.get( 'warnCount' )
+
+        job.version = jobDict.get( 'version', '0.0.0' )
+        job.buildNum = jobDict.get('buildNum', 0 )
 
         # FIXME: how to check if these optional fields exist? The
         # example if u'logLink' in jobDict doesn't work

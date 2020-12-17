@@ -1,7 +1,7 @@
 #!/bin/bash
-if [ -z "$1" ] 
+if [ "$#" -ne 3 ] 
 	then
-	echo "Use civclicker_build.sh <path_to_work_dir>"
+	echo "Use civclicker_build.sh <path_to_work_dir> <commit_ver> <build_num>"
 	exit 1
 fi
 
@@ -17,6 +17,10 @@ trap 'echo "\"${last_command}\" failed with exit code $?."' EXIT
 cd $1
 ./fips set config metal-ios-xcode-release
 ./fips gen
+
+# Set the version number and the build number
+python3 ./scripts/tag_version.py $2 $3
+
 ./fips build
 
 
