@@ -154,19 +154,26 @@ def page_not_found(e):
   return render_template('error404.html', description=e.description ), 404
 
 
-if __name__ == '__main__':
 
-    # TODO get this from environment or args
-    agentCfgFile = "/opt/tkbuild/tkbuild_agent.yml"
-    agent = TKBuildAgent.createFromConfigFile(agentCfgFile)
+def makeReadyWebApp( cfgFile, do_cloud_logging ):
 
-    db = connectCloudStuff(agent)
+    global agent
+    agent = TKBuildAgent.createFromConfigFile(cfgFile)
+
+    db = connectCloudStuff(agent, do_cloud_logging)
     if not db:
         logging.error("Connecting to cloud stuff failed.")
         sys.exit(1)
 
     agent.db = db
-    logging.info("Tkbuild web ready.")
 
     app.register_error_handler(404, page_not_found)
+    logging.info("Tkbuild web ready.")
+
+
+if __name__ == '__main__':
+
+    # TODO get this from environment or args
+    agentCfgFile = "/opt/tkbuild/tkbuild_agent.yml"
+    makeReadyWebApp( agentCfgFile, False )
     app.run(debug=True, host='0.0.0.0')

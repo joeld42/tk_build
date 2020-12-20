@@ -22,7 +22,7 @@ from tkbuild.project import TKBuildProject
 from tkbuild.agent import TKBuildAgent
 
 
-def connectCloudStuff( agent ):
+def connectCloudStuff( agent, do_cloud_logging ):
 
     """ Connects to logging and firestore DB and returns the db connection"""
 
@@ -40,7 +40,6 @@ def connectCloudStuff( agent ):
     db = firestore.client()
 
     # Initialize logging
-    do_cloud_logging = True
     if do_cloud_logging:
         # logger = logging_client.logger("tkbuild-agent-" + agent.name )
         logging_client = google.cloud.logging.Client( )
