@@ -239,10 +239,26 @@ class TKBuildAgent(object):
 
         self.commitJobChanges( job )
 
-    def replacePathVars(self, origPath, workdirRepoPath ):
+    def replacePathVars(self, origPath, workdirRepoPath, proj, job ):
 
-        result = origPath.replace("$TKBUILD", self.tkbuildDir)
-        result = result.replace("$WORKDIR", workdirRepoPath)
+        vars = {
+            "TKBUILD" : self.tkbuildDir,
+            "WORKDIR" : workdirRepoPath,
+            "PROJWORKDIR" : proj.workDir,
+            "COMMIT"  : job.commitVer,
+            "VERSION" : job.version,
+            "BUILDNUM" : str( job.buildNum )
+        }
+
+        result = origPath
+        for varname, value in vars.items():
+            varstr = "$" + varname
+            if result.find( varstr ) != -1:
+                print("SUBST VAR ", varstr, value )
+                result = result.replace( varstr, value )
+
+        # result = origPath.replace("$TKBUILD", self.tkbuildDir)
+        # result = result.replace("$WORKDIR", workdirRepoPath)
 
         return result
 
@@ -255,7 +271,7 @@ class TKBuildAgent(object):
 
         # Make sure the file exists
         artifactFile = wsdef.artifact
-        artifactFile = self.replacePathVars( artifactFile, workdirRepoPath )
+        artifactFile = self.replacePathVars( artifactFile, workdirRepoPath, proj, job )
         if not os.path.exists( artifactFile ):
             logging.warning( f"Artifact file {artifactFile} does not exist.")
             return False
@@ -286,6 +302,20 @@ class TKBuildAgent(object):
 
             return True
 
+    def peekVersion( self, job, versionFile ):
+
+        if not os.path.exists( versionFile ):
+            logging.warning( f"Version file {versionFile} does not exist.")
+            return
+
+        with open( versionFile ) as fp:
+            verLine = fp.readline().strip()
+
+            if verLine:
+                job.version = verLine
+                logging.info( f"PeekVersion: Version is {job.version}" )
+
+
     def runNextJobStep(self, job ):
 
         logging.info("Run next job step....")
@@ -308,62 +338,73 @@ class TKBuildAgent(object):
                 with open( workstepLog, "wt") as fpLog:
                     fpLog.write( f"WORKSTEP: {wsdef.stepname}\n" )
 
-                    # Treat 'fetch' specially for now
+                    # Extra magic for 'fetch' and 'build' for now
                     if wsdef.stepname == 'fetch':
                         if not self.workstepFetch( job, wsdef, fpLog ):
                             logging.warning("fetch workstep FAILED.")
                             # The fetch failed for some reason, fail the workstep
                             self.failJob( job, wsdef )
+                            break
                         else:
                             logging.info("fetch succeeded, marking as DONE")
                             job.setWorkstepStatus(wsdef.stepname, JobStatus.DONE)
                             self.commitJobChanges(job)
 
-                        break
+                    elif wsdef.stepname == 'build':
+                        job.buildNum = proj.incrementBuildNumber( self.db )
+
+                    # Common workstep steps
+                    logging.info( f"Will do job step {wsdef.stepname}" )
+                    workdirRepoPath = os.path.join(proj.workDir, job.jobDirShort)
+                    if wsdef.cmd:
+
+                        # Fixme: allow array args or something to handle spaces in args
+                        stepCmd = []
+                        for stepCmdSplit in wsdef.cmd.split():
+
+                            # Replace the project dirs
+                            stepCmdSplit = self.replacePathVars( stepCmdSplit, workdirRepoPath, proj, job )
+
+                            stepCmd.append( stepCmdSplit )
+
+                        result, cmdTime = self.echoRunCommand( stepCmd, fpLog, self, job )
+                    elif wsdef.stepname != 'fetch':
+                        # Fetch might not have a cmd, but other steps probably will
+                        logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
+                        result = 0 # treat as done
+                        cmdTime = datetime.timedelta(0)
+
+                    if result == 0:
+                        # Did succeed?
+                        logging.info(f"Workstep {job.projectId}:{wsdef.stepname} completed success.")
+
+                        # If this workstep generates a version number, retrieve it now
+                        if wsdef.peekVersion:
+                            versionFile = self.replacePathVars( wsdef.peekVersion, workdirRepoPath, proj, job )
+                            self.peekVersion( job, versionFile )
+
+                        # And set the status to done
+                        job.setWorkstepStatus(wsdef.stepname, JobStatus.DONE )
+                        self.commitJobChanges(job)
+
+                        # If this workstep made an artifact that should get published, do so
+                        logging.info( f"wsdef artifact is {wsdef.artifact}")
+                        if wsdef.artifact:
+                            if not self.publishArtifact( proj, job, wsdef, workdirRepoPath ):
+                                self.failJob( job, wsdef )
+
                     else:
-                        # Regular workstep
-                        logging.info( f"Will do job step {wsdef.stepname}" )
-                        workdirRepoPath = os.path.join(proj.workDir, job.jobDirShort)
-                        if wsdef.cmd:
+                        # Step failed, fail the whole job :_(
+                        self.failJob( job, wsdef )
 
-                            # Fixme: allow array args or something to handle spaces in args
-                            stepCmd = []
-                            for stepCmdSplit in wsdef.cmd.split():
-
-                                # Replace the project dirs
-                                stepCmdSplit = self.replacePathVars( stepCmdSplit, workdirRepoPath )
-
-                                stepCmd.append( stepCmdSplit )
-
-                            result, cmdTime = self.echoRunCommand( stepCmd, fpLog, self, job )
-                        else:
-                            logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
-                            result = 0 # treat as done
-                            cmdTime = datetime.timedelta(0)
-
-                        if result == 0:
-                            # Did succeed?
-                            logging.info(f"Workstep {job.projectId}:{wsdef.stepname} completed success.")
-                            job.setWorkstepStatus(wsdef.stepname, JobStatus.DONE )
-                            self.commitJobChanges(job)
-
-                            # If this workstep made an artifact that should get published, do so
-                            logging.info( f"wsdef artifact is {wsdef.artifact}")
-                            if wsdef.artifact:
-                                if not self.publishArtifact( proj, job, wsdef, workdirRepoPath ):
-                                    self.failJob( job, wsdef )
-
-                        else:
-                            # Step failed, fail the whole job :_(
-                            self.failJob( job, wsdef )
-
-                        break
+                    break
 
     def makePristineRepoPath(self, proj ):
         pristineRepoPath = os.path.join(proj.projectDir, proj.projectId + "_pristine")
         return pristineRepoPath
 
     def getRecentCommits(self, proj ):
+
         pristineRepoPath = self.makePristineRepoPath( proj)
         if not os.path.exists(pristineRepoPath):
             # Don't implicitly pull the repo here
@@ -374,7 +415,10 @@ class TKBuildAgent(object):
                   "log", "--oneline", "--no-decorate", "-n","20"
                   ]
         print( "gitCmd is ", gitCmd )
-        result = subprocess.run( gitCmd, capture_output=True )
+
+        # PIPE nonsense does capture_output in py3.6
+        #result = subprocess.run( gitCmd, capture_output=True )
+        result = subprocess.run( gitCmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )
         if result.returncode:
             return [ "ERROR in git log" ]
         else:
@@ -385,11 +429,7 @@ class TKBuildAgent(object):
             return commitList
 
 
-    # I don't like this workstep being hardcoded in the agent but not sure exactly
-    # how I want it to look so I'm putting it here for now.
-    def workstepFetch(self, job, wsdef, fpLog ):
-
-        proj = self.projects[job.projectId]
+    def updatePristineRepo( self, proj, wsdef, fpLog ):
 
         # see if the "pristine repo" exists
         pristineRepoPath = self.makePristineRepoPath( proj )
@@ -406,6 +446,19 @@ class TKBuildAgent(object):
                        "pull" ]
         retVal, cmdTime = self.echoRunCommand(gitPullCmd, fpLog )
         if retVal:
+            return None
+
+        return pristineRepoPath
+
+
+    # I don't like this workstep being hardcoded in the agent but not sure exactly
+    # how I want it to look so I'm putting it here for now.
+    def workstepFetch(self, job, wsdef, fpLog ):
+
+        proj = self.projects[job.projectId]
+
+        pristineRepoPath = self.updatePristineRepo( proj, wsdef, fpLog )
+        if not pristineRepoPath:
             return False
 
         # Now clone the pristine repo into the work dir
@@ -440,9 +493,12 @@ class TKBuildAgent(object):
     def echoRunCommand( self, command, fpLog, agent = None, job = None ):
 
         """returns ( returnValue, timeTaken) """
+
         cmdStr = " ".join(command)
-        fpLog.write( "CMD: " + cmdStr + "\n")
-        fpLog.flush()
+        if fpLog:
+
+            fpLog.write( "CMD: " + cmdStr + "\n")
+            fpLog.flush()
 
         logging.info(cmdStr)
 
@@ -454,43 +510,48 @@ class TKBuildAgent(object):
         # FIXME: handle STDERR separately, but python makes this hard
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT )  # , shell=True)
 
-        for linebytes in self._runCommandInternal(process):
+        while True:
+            for linebytes in self._runCommandInternal(process):
+                line = linebytes.decode("utf-8")
 
-            line = linebytes.decode("utf-8")
+                isError = False
+                isWarn = False
 
-            isError = False
-            isWarn = False
+                # FIXME: Better parsing here, also make it tool-aware
+                if line.find( "fatal:") >= 0 or line.find( "error:" ) >= 0:
+                    isError = True
+                elif line.find("warning:") >= 0:
+                    isWarn = True
 
-            # FIXME: Better parsing here, also make it tool-aware
-            if line.find( "fatal:") >= 0 or line.find( "error:" ) >= 0:
-                isError = True
-            elif line.find("warning:") >= 0:
-                isWarn = True
+                if isError:
+                    logging.error(line)
+                    if fpLog:
+                        fpLog.write( "ERROR: "+ line + "\n")
+                        fpLog.flush()
 
-            if isError:
-                logging.error(line)
-                fpLog.write( "ERROR: "+ line + "\n")
-                fpLog.flush()
+                    if job:
+                        job.countError()
 
-                if job:
-                    job.countError()
+                elif isWarn:
+                    logging.warning(line)
+                    if fpLog:
+                        fpLog.write("WARN: " + line + "\n")
+                        fpLog.flush()
+                    if job:
+                        job.countWarning()
 
-            elif isWarn:
-                logging.warning(line)
-                fpLog.write("WARN: " + line + "\n")
-                fpLog.flush()
-                if job:
-                    job.countWarning()
+                else:
+                    logging.info( line )
+                    if fpLog:
+                        fpLog.write( line + "\n")
+                        fpLog.flush()
 
-            else:
-                logging.info( line )
-                fpLog.write( line + "\n")
-                fpLog.flush()
+                if (isError or isWarn) and (agent and job):
+                    agent.commitJobChanges( job )
 
-            if (isError or isWarn) and (agent and job):
-                agent.commitJobChanges( job )
-
-        process.wait()
+            # Is the subprocess done?
+            if process.poll() is not None:
+                break
 
         endTime = datetime.datetime.now()
         cmdDuration = endTime - startTime
@@ -498,7 +559,8 @@ class TKBuildAgent(object):
         cmdStatus = f"Finished with retval {process.returncode} time taken {cmdDuration}";
         logging.info( cmdStatus )
 
-        fpLog.write( cmdStatus + "\n\n\n" )
-        fpLog.flush()
+        if fpLog:
+            fpLog.write( cmdStatus + "\n\n\n" )
+            fpLog.flush()
 
         return (process.returncode, cmdDuration)

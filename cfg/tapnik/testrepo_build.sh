@@ -1,7 +1,7 @@
 #!/bin/bash
-if [ -z "$1" ] 
+if [ "$#" -ne 3 ] 
 	then
-	echo "Use testrepo_build.sh <path_to_work_dir>"
+	echo "Use testrepo_build.sh <path_to_work_dir> <commit_ver> <build_num>"
 	exit 1
 fi
 
@@ -16,7 +16,7 @@ trap 'echo "\"${last_command}\" failed with exit code $?."' EXIT
 # Actual build steps here
 mkdir -p $1/build
 cd $1/build
-cmake ..
+cmake .. -DCOMMIT:STRING=$2 -DBUILDNUM:STRING=$3
 make VERBOSE=1
 
 

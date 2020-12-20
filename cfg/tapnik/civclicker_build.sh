@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ "$#" -ne 3 ] 
 	then
-	echo "Use testrepo_package.sh <path_to_work_dir> <version> <build_num>"
+	echo "Use civclicker_build.sh <path_to_work_dir> <commit_ver> <build_num>"
 	exit 1
 fi
 
@@ -14,10 +14,15 @@ trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
 trap 'echo "\"${last_command}\" failed with exit code $?."' EXIT
 
 # Actual build steps here
-mkdir -p $1/testrepo
 cd $1
-cp build/puzzle3 testrepo/
-cp README.md testrepo/
-zip -r -X testrepo_$2_build_$3.zip testrepo
+./fips set config metal-ios-xcode-release
+./fips gen
+
+# Set the version number and the build number
+python3 ./scripts/tag_version.py $2 $3
+
+./fips build
+
+
 
 

@@ -34,7 +34,6 @@ def connectCloudStuff( agent, do_cloud_logging ):
 
     cred = credentials.Certificate( os.environ.get( credKey ) )
     firebase_admin.initialize_app(cred, {
-      #'projectId': 'rising-environs-295900',
         'projectId' : agent.googleProjectId
     })
     db = firestore.client()
@@ -45,7 +44,19 @@ def connectCloudStuff( agent, do_cloud_logging ):
         logging_client = google.cloud.logging.Client( )
         logging_handler = google.cloud.logging.handlers.CloudLoggingHandler(logging_client, name="tkbuild-agent-" + agent.name )
         google.cloud.logging.handlers.setup_logging( logging_handler )
+
+        # Also echo to stdout
+        rootLogger = logging.getLogger()
+        #rootLogger.setLevel(logging.DEBUG)
+
+        stdoutHandler = logging.StreamHandler(sys.stdout)
+        #stdoutHandler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(levelname)s: %(message)s')
+        stdoutHandler.setFormatter(formatter)
+        rootLogger.addHandler(stdoutHandler)
+
     else:
+        # Just run with stdout logging for testing
         logging.basicConfig( level=logging.INFO )
 
     # logging.debug("log debug")
@@ -57,7 +68,12 @@ def connectCloudStuff( agent, do_cloud_logging ):
     logging.info ( f"Agent: {agent.name}: {agent.desc}" )
     testRepoProj = None
     for p in agent.projects.values():
-        logging.info( f"Project: {p.projectId} -- {p.repoUrl}" )
+
+        fetchRepoUrl = "(No Fetch Step Defined)"
+        pfetch = p.getFetchWorkstep()
+        if pfetch:
+            fetchRepoUrl = pfetch.repoUrl
+        logging.info( f"Project: {p.projectId} -- {fetchRepoUrl}" )
 
     return db
 

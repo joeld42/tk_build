@@ -24,6 +24,9 @@
                 {% endfor %}
             </datalist>
         </div>
+      <div class="col-sm-1">
+          <a href="{{ url_for('project_refresh_repo', project_id=project.projectId ) }}" class="btn btn-secondary">Refresh</a>
+      </div>
 
       </div>
 
