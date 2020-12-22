@@ -1,6 +1,6 @@
 # flask_web/app.py
 import os, sys
-
+import pytz
 from flask import Flask, render_template, redirect, url_for, request, abort
 
 app = Flask("tk_build",
@@ -15,17 +15,42 @@ from tkbuild.cloud import connectCloudStuff
 from tkbuild.job import TKBuildJob, TKWorkstepDef
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
+from tkbuild.friendlyname import friendlyName
 
 import logging
 
 agent = None
 
+PST = pytz.timezone('US/Pacific')
+
+@app.template_filter('timestamp')
+def format_datetime(date, fmt="%a, %m/%d/%Y %I:%M%p"):
+    return date.astimezone(PST).strftime(fmt)
+
+@app.template_filter('friendly')
+def format_friendly( idstr ):
+    return friendlyName( idstr )
+
+
 @app.route('/')
 def index():
 
-    projs = agent.projects.values()
+    #projs = agent.projects.values()
+    projs = agent.orderedProjects()
 
-    return render_template('index.html', projects=projs, active='projects' )
+    # Get all the project info and fetch latest job info
+    lastjob = {}
+    for proj in projs:
+        buildNum, jobKey = proj.getBuildNumberAndJob( agent.db )
+
+        if jobKey:
+            jobRef = agent.db.collection(u'jobs').document(jobKey).get()
+            if jobRef.exists:
+                job = TKBuildJob.createFromFirebaseDict(proj, jobKey, jobRef)
+                lastjob[ proj.projectId ] = job
+
+
+    return render_template('index.html', projects=projs, active='projects', lastjob = lastjob )
 
 @app.route('/jobs')
 def jobs_overview():
@@ -54,6 +79,17 @@ def jobs_overview():
                            wsstyles=wsstyles, agent=agent, allwsnames = allwsnames,
                            active='jobs')
 
+@app.route('/job_details/<jobkey>' )
+def job_details( jobkey ):
+
+    jobRef = agent.db.collection(u'jobs').document( jobkey ).get()
+    #if jobRef.ex
+    jobDict = jobRef.to_dict()
+    proj = agent.projects.get( jobDict['projectId'] )
+
+    job = TKBuildJob.createFromFirebaseDict( proj, jobRef.id, jobRef )
+    return render_template( 'job_details.html', job=job )
+
 @app.route('/del_job/<jobkey>' )
 def del_job( jobkey ):
 
@@ -70,15 +106,17 @@ def builds_overview():
 
         print( "ArtifactData is ", artifactData.to_dict() )
 
-        artifact = TKArtifact.createFromFirebaseDict( artifactData.id, artifactData )
+        artifact = TKArtifact.createFromFirebaseDict( artifactData.id, artifactData.to_dict() )
         if not artifact.project in artifacts:
             artifacts[ artifact.project ] = []
 
         artifacts[artifact.project].append( artifact )
 
-    print("All Artifacts", artifacts)
+    # print("All Artifacts", artifacts)
+    for pk in artifacts.keys():
+        artifacts[ pk ].sort( key=lambda a: a.timestamp, reverse=True )
 
-    return render_template('builds.html', projects=agent.projects.values(), artifacts=artifacts, active='builds' )
+    return render_template('builds.html', projects=agent.orderedProjects(), artifacts=artifacts, active='builds' )
 
 @app.route('/project/<project_id>' )
 def project_overview( project_id ):

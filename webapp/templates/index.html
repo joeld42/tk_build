@@ -16,10 +16,34 @@
             {% endif %}
         </div>
         <div class="col-lg-10">
-            <p class="h2">{{ proj.projectId }}</p>
-            <a href="{{ proj.repoUrl }}"><p class="font-monospace">{{ proj.repoUrl }}</p></a>
-            <p><em>Build Status:</em> <span class="badge bg-success">Todo</span></p>
-            <p><em>Latest Build: </em><a href="#">v?.?.?</a></p>
+            {% with job=lastjob[ proj.projectId ] %}
+                <p class="h2">{{ proj.projectId }}
+                    {% if job %}
+                        {% if job.activeStatus()=='done' %}
+                            <span class="badge bg-success">Success</span>
+                        {% elif job.activeStatus()=='active' %}
+                            <span class="badge bg-info text-dark">Active</span>
+                        {% elif job.activeStatus()=='fail' %}
+                            <span class="badge bg-warning">Failed</span>
+                        {% elif job.activeStatus()=='cancel' %}
+                            <span class="badge bg-success">Cancelled</span>
+                        {% else %}
+                            <span class="badge bg-warning">Somthing</span>
+                        {% endif %}
+                    </p>
+
+                    <ul class="list-unstyled">
+                    <li><em>Latest Job: </em><a href="{{ url_for('job_details', jobkey=job.jobKey ) }}">{{ job.jobKey|friendly }}</a></li>
+                    <li><em>Build Version: </em><a href="{{ url_for('builds_overview') }}">#{{ job.buildNum }} &mdash; v{{ job.version }}</a></li>
+                    <li><em>Commit: </em><a href="{{ proj.getCommitUrl( job.commitVer )}}" target="_blank">{{ job.commitVer }}</a></li>
+                    </ul>
+
+                {% else %}
+                    <span class="badge bg-secondary">Unknown</span>
+                    </p>
+                    <p>No job info available.</p>
+                {% endif %}
+            {% endwith %}
         </div>
 
     </div>

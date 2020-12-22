@@ -1,4 +1,7 @@
 # Function dependencies, for example:
 # package>=version
+Flask>=1.1.2
+PyYAML>=5.3.1
 firebase-admin>=4.4.0
 google-cloud-logging>=2.0.0
+

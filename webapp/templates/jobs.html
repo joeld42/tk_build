@@ -37,7 +37,7 @@
                     <span class="badge bg-warning text-dark">Warnings: {{ job.warnCount }}</span>
                 </p>
 
-                <p><small>{{ job.jobKey }}</small></p>
+                <p><small><a href="{{url_for('job_details', jobkey=job.jobKey )}}">{{ job.jobKey|friendly }}</a></small></p>
             </div>
 
             <div class="card-body">
@@ -88,7 +88,7 @@
 
             <div class="card-body">
 
-                <p><em>{{ job.jobKey }}</em></p>
+                <p><em><a href="{{url_for('job_details', jobkey=job.jobKey )}}">{{ job.jobKey|friendly }}</a></em></p>
                 <p><small>{{ job.version }} #{{ job.buildNum }}</small></p>
                 {# <p><small>{{ job.worksteps }}</small></p> #}
                 <a href="{{ url_for('del_job', jobkey=job.jobKey ) }}" class="btn btn-sm btn-danger" role="button">DEL</a>

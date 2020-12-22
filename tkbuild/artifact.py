@@ -1,8 +1,13 @@
 import os, sys
+import datetime
+import pytz
+
 from enum import Enum
 import logging
 
 from firebase_admin.firestore import SERVER_TIMESTAMP
+
+DEFAULT_ARTIFACT_DATE = datetime.datetime(2020, 12, 1, tzinfo=pytz.UTC)
 
 class TKArtifact(object ):
 
@@ -35,6 +40,6 @@ class TKArtifact(object ):
         artifact.project = dataDict.get('project' )
         artifact.commitVer = dataDict.get( 'commitVer' )
         artifact.builtFile = dataDict.get( 'builtFile' )
-        artifact.timestamp = dataDict.get( 'builtFile' )
+        artifact.timestamp = dataDict.get( 'timestamp', DEFAULT_ARTIFACT_DATE )
 
         return artifact

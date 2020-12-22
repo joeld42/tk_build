@@ -141,6 +141,13 @@ class TKBuildAgent(object):
                 configData = yaml.full_load(fpconfig)
                 return cls.createFromConfig( configData, defaultTkBuildDir )
 
+    def orderedProjects(self):
+
+        projects = list( self.projects.values() )
+        projects.sort( key=lambda pp: pp.sortKey )
+        return projects
+
+
     def serverMainloop(self, db ):
 
         self.db = db
@@ -185,8 +192,9 @@ class TKBuildAgent(object):
         print( f" {len(self.jobList)} avail jobs:")
 
         # Check if there are any jobdirs that do not exist in the job list. If so, clean up those job dirs.
+
+        # Check if there are jobs we can do
         for job in self.jobList:
-            print( f"JOB: {job.jobKey} steps: {job.worksteps} ")
 
             proj = self.projects[job.projectId]
 
@@ -351,7 +359,7 @@ class TKBuildAgent(object):
                             self.commitJobChanges(job)
 
                     elif wsdef.stepname == 'build':
-                        job.buildNum = proj.incrementBuildNumber( self.db )
+                        job.buildNum = proj.incrementBuildNumber( job.jobKey, self.db )
 
                     # Common workstep steps
                     logging.info( f"Will do job step {wsdef.stepname}" )

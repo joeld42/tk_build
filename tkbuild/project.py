@@ -27,6 +27,7 @@ class TKBuildProject(object):
         self.workDir = None
         self.icon = None
         self.bucketName = None
+        self.sortKey = 1000
 
         # Now fill in some computed defaults if some things aren't specified
         if self.workDir is None:
@@ -43,6 +44,7 @@ class TKBuildProject(object):
         proj.bucketName = configData.get( "bucketName" )
         proj.info_ref = None
         proj.info = None
+        proj.sortKey = int(configData.get( "sortKey", 1000 ))
 
         if 'workDir' in configData:
             proj.workDir = configData['workDir']
@@ -71,6 +73,27 @@ class TKBuildProject(object):
 
         return proj
 
+    def getRepoUrl(self):
+
+        wsfetch = self.getFetchWorkstep()
+        if wsfetch:
+            return wsfetch.repoUrl
+        return None
+
+    def getCommitUrl(self, commit ):
+
+        wsfetch = self.getFetchWorkstep()
+        if not wsfetch:
+            return None
+
+        repoBase = wsfetch.repoUrl
+        if repoBase.endswith( ".git"):
+            repoBase = repoBase[:-4]
+
+        commitUrl = os.path.join( repoBase, "commit", commit )
+
+        return commitUrl
+
     def getFetchWorkstep(self):
 
         for wsdef in self.workstepDefs:
@@ -85,25 +108,41 @@ class TKBuildProject(object):
 
             infosnap = self.info_ref.get()
             if not infosnap.exists:
-                self.info = { 'build_num' : DEFAULT_BUILD_NUM }
+                self.info = { 'build_num' : DEFAULT_BUILD_NUM, 'latest_job' : "" }
                 self.info_ref.set( self.info )
             else:
                 self.info = infosnap.to_dict()
 
         return self.info
 
+    def getCachedBuildNumber(self):
+        return self.info.get( 'build_num', DEFAULT_BUILD_NUM )
+
+    def getCachedLatestJob(self):
+
+        result =  self.info.get( 'latest_job', '????' )
+        print(f"getCachedLatestJob ProjectID {self.projectId} info {self.info} result {result}")
+        return result
+
+    def getBuildNumberAndJob(self, db ):
+
+        info = self.getProjectInfo( db )
+        buildNum = info.get( 'build_num', DEFAULT_BUILD_NUM )
+        lastJobKey = info.get( 'latest_job')
+
+        return (buildNum, lastJobKey )
+
     def getBuildNumber(self, db ):
 
         info = self.getProjectInfo( db )
-
         return info.get( 'build_num', DEFAULT_BUILD_NUM )
 
 
 
-    def incrementBuildNumber(self, db ):
+    def incrementBuildNumber(self, jobKey, db ):
 
         buildNum = self.getBuildNumber( db ) + 1
-        self.info_ref.update( { 'build_num' : buildNum  })
+        self.info_ref.update( { 'build_num' : buildNum , 'latest_job' : jobKey })
         self.info = self.info_ref.get().to_dict()
 
         return self.info['build_num']
