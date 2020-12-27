@@ -1,5 +1,12 @@
 from enum import Enum
 import logging
+import datetime
+import pytz
+
+
+from firebase_admin.firestore import SERVER_TIMESTAMP
+
+DEFAULT_JOB_DATE = datetime.datetime(2020, 12, 2, tzinfo=pytz.UTC)
 
 class TKWorkstepDef(object):
     def __init__(self):
@@ -38,6 +45,7 @@ class TKBuildJob(object ):
         self.jobDirShort = "nojobdir"
         self.version = "0.0.0"
         self.buildNum = 0
+        self.timestamp = None
         self.worksteps = {
             "fetch" : JobStatus.TODO
         }
@@ -125,7 +133,8 @@ class TKBuildJob(object ):
             "githubJson" : self.githubJson,
             "worksteps" : self.worksteps,
             "version" : self.version,
-            "buildNum" : self.buildNum
+            "buildNum" : self.buildNum,
+            "timestamp": SERVER_TIMESTAMP if self.timestamp is None else self.timestamp
         }
 
     @classmethod
@@ -142,10 +151,10 @@ class TKBuildJob(object ):
         job.version = jobDict.get( 'version', '0.0.0' )
         job.buildNum = jobDict.get('buildNum', 0 )
 
-        # FIXME: how to check if these optional fields exist? The
-        # example if u'logLink' in jobDict doesn't work
         job.logLink = jobDict.get('logLink')
         job.githubJson = jobDict.get( 'githubJson' )
+
+        job.timestamp = jobDict.get('timestamp', DEFAULT_JOB_DATE)
 
         # Worksteps is a string : string dict in both, no conversion needed
         job.worksteps =jobDict.get( 'worksteps' )

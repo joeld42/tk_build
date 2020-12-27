@@ -22,12 +22,7 @@
 <div class="row pt-2 border-top border-secondary border-3">
 
 <div class="row">
-{# Using a dict for this is a workaround for jinja scoping #}
-{% set has_active = { 'flag': False } %}
-
-{% for job in jobs %}
-    {% if job.activeStatus()=='active' %}
-    {%- if has_active.update({'flag':True}) %}{% endif %}
+{% for job in jobs_active %}
 
     <div class="card" style="width: 18rem;" >
             <div class="card-header">
@@ -57,12 +52,9 @@
               <a href="#link" class="btn btn-sm btn-secondary" role="button">Logs</a>
           </div>
     </div>
-    {% endif %}
-{% endfor %}
-
-    {% if not has_active.flag %}
+{% else %}
     <h1 class="display-6 fw-lighter">No Active Jobs</h1>
-    {% endif %}
+{% endfor %}
 
 </div>
 
@@ -72,8 +64,7 @@
 <div class="row pt-2 border-top border-secondary border-3">
 
 <div class="row">
-    {% for job in jobs %}
-        {% if job.activeStatus()!='active' %}
+    {% for job in jobs_inactive %}
         <div class="card" style="width: 18rem;" >
             {% if job.activeStatus() == 'done' %}
             <div class="card-header bg-success text-white">
@@ -89,13 +80,13 @@
             <div class="card-body">
 
                 <p><em><a href="{{url_for('job_details', jobkey=job.jobKey )}}">{{ job.jobKey|friendly }}</a></em></p>
+                <p><small>{{ job.timestamp | timestamp }}</small></p>
                 <p><small>{{ job.version }} #{{ job.buildNum }}</small></p>
                 {# <p><small>{{ job.worksteps }}</small></p> #}
                 <a href="{{ url_for('del_job', jobkey=job.jobKey ) }}" class="btn btn-sm btn-danger" role="button">DEL</a>
-                <a href="#" class="btn btn-sm btn-secondary" role="button">Details</a>
+                <a href="{{url_for('job_details', jobkey=job.jobKey )}}" class="btn btn-sm btn-secondary" role="button">Details</a>
             </div>
         </div>
-        {% endif %}
     {% endfor %}
 </div>
 

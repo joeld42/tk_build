@@ -12,7 +12,7 @@ app.logger.removeHandler(default_handler)
 
 from tkbuild.agent import TKBuildAgent
 from tkbuild.cloud import connectCloudStuff
-from tkbuild.job import TKBuildJob, TKWorkstepDef
+from tkbuild.job import TKBuildJob, TKWorkstepDef, ActiveStatus
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
 from tkbuild.friendlyname import friendlyName
@@ -55,12 +55,17 @@ def index():
 @app.route('/jobs')
 def jobs_overview():
 
-    jobs = []
+    jobs_active = []
+    jobs_inactive = []
     jobsData = agent.db.collection(u'jobs').get()
     for jobData in jobsData:
         project = agent.projects[ jobData.get('projectId') ]
         job = TKBuildJob.createFromFirebaseDict( project, jobData.id, jobData )
-        jobs.append( job )
+
+        if job.activeStatus()==ActiveStatus.ACTIVE:
+            jobs_active.append( job )
+        else:
+            jobs_inactive.append( job )
 
     wsstyles = { 'done': 'bg-success',
                 'todo' : 'bg-secondary',
@@ -75,7 +80,12 @@ def jobs_overview():
             if not wsdef.stepname in allwsnames:
                 allwsnames.append( wsdef.stepname )
 
-    return render_template('jobs.html', jobs=jobs, projects=agent.projects.keys(),
+    jobs_active.sort( key=lambda a: a.timestamp, reverse=True )
+    jobs_inactive.sort(key=lambda a: a.timestamp, reverse=True)
+
+    return render_template('jobs.html',
+                           jobs_active=jobs_active, jobs_inactive=jobs_inactive,
+                           projects=agent.projects.keys(),
                            wsstyles=wsstyles, agent=agent, allwsnames = allwsnames,
                            active='jobs')
 
