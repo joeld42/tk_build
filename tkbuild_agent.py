@@ -19,7 +19,7 @@ if __name__=='__main__':
     agentCfgFile = "/opt/tkbuild/tkbuild_agent.yml"
     agent = TKBuildAgent.createFromConfigFile( agentCfgFile )
 
-    db = connectCloudStuff( agent, True )
+    db = connectCloudStuff( agent, False )
     if not db:
         logging.error("Connecting to cloud stuff failed.")
         sys.exit(1)

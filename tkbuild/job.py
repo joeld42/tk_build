@@ -40,6 +40,7 @@ class TKBuildJob(object ):
         self.commitVer = "1234"
         self.errorCount = 0
         self.warnCount = 0
+        self.lastError = ""
         self.logLink = ""
         self.githubJson = None
         self.jobDirShort = "nojobdir"
@@ -69,8 +70,10 @@ class TKBuildJob(object ):
 
         self.wsnames = wsnames
 
-    def countError(self):
+    def countError(self, lastError):
         self.errorCount += 1
+        if lastError:
+            self.lastError = lastError
         logging.info( f"Errorcount bumped, is now {self.errorCount}")
 
     def countWarning(self):
@@ -82,9 +85,6 @@ class TKBuildJob(object ):
 
     def activeStatus(self):
         statuses = list(self.worksteps.values())
-        print("Statuses are ", statuses)
-
-        print( JobStatus.TODO,  JobStatus.TODO in statuses )
 
         # First, check if there are any steps running or todo
         if ((JobStatus.TODO in statuses) or
@@ -102,6 +102,24 @@ class TKBuildJob(object ):
 
         # Didn't fail or cancel, must of succeeded
         return ActiveStatus.DONE
+
+    def activeStatusSummary(self):
+        """Returns a readable summary of the job status"""
+        # First look for a failed status
+        for wsname,status in self.worksteps.items():
+            if status == ActiveStatus.FAIL:
+                return f"Job failed in workstep '{wsname}'."
+
+        # Now look for any cancelled status (may be multiple because they cascade)
+        cancelStatus = []
+        for wsname,status in self.worksteps.items():
+            if status == ActiveStatus.CANCEL:
+                cancelStatus.append( wsname )
+
+        if cancelStatus:
+            return ("Job cancelled with worksteps remaining: %s", ", ".join( cancelStatus ))
+
+        return "Job completed."
 
     def hasWorkRemaining(self, worksteps ):
         for stepname in worksteps:
@@ -128,6 +146,7 @@ class TKBuildJob(object ):
             "projectId" : self.projectId,
             "commitVer" : self.commitVer,
             "errorCount" : self.errorCount,
+            "lastError" : self.lastError,
             "warnCount" : self.warnCount,
             "logLink" : self.logLink,
             "githubJson" : self.githubJson,
@@ -147,6 +166,7 @@ class TKBuildJob(object ):
         job.commitVer = jobDict.get( 'commitVer' )
         job.errorCount = jobDict.get( 'errorCount' )
         job.warnCount = jobDict.get( 'warnCount' )
+        job.lastError = jobDict.get('lastError')
 
         job.version = jobDict.get( 'version', '0.0.0' )
         job.buildNum = jobDict.get('buildNum', 0 )

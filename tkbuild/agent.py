@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os, sys, time, re
-import datetime
+import datetime, pytz
 import subprocess
 from enum import Enum
 
@@ -191,7 +191,11 @@ class TKBuildAgent(object):
 
         print( f" {len(self.jobList)} avail jobs:")
 
+        # Check if there are any obsolete jobs, and delete them
+        self.cleanupObsoleteJobs()
+
         # Check if there are any jobdirs that do not exist in the job list. If so, clean up those job dirs.
+        # TODO
 
         # Check if there are jobs we can do
         for job in self.jobList:
@@ -229,6 +233,34 @@ class TKBuildAgent(object):
         #     - Change workstep status to “running”
         #     - Do the workstep (call $PROJECT_DIR/workdir/$REPO_NAME/tkbuild workstep)
         #     - Change the workstep status to “Completed” or “Failed”
+
+    def cleanupOldProjectJobs(self, proj, projJobExpireDate ):
+
+        print("cleanupOldProjectJobs", proj.projectId, len(self.jobList) )
+        for job in self.jobList:
+            if (job.projectId==proj.projectId) and (job.timestamp < projJobExpireDate):
+                self.db.collection(u'jobs').document(job.jobKey).delete()
+
+    def cleanupObsoleteJobs(self):
+
+        if len(self.jobList)==0:
+            return
+
+        for proj in self.projects.values():
+
+            projJobExpireDate = datetime.datetime.now( tz=pytz.UTC ) - datetime.timedelta( minutes=proj.jobDeleteAge )
+            print(f"Project {proj.projectId} will expire jobs before {projJobExpireDate}")
+
+            self.cleanupOldProjectJobs( proj, projJobExpireDate )
+
+            # Now clean up any workdirs for these (this might not happen
+            # right away because the joblist may not be updated yet)
+            self.cleanupOldJobdirs( proj )
+
+    def cleanupOldJobdirs(self, proj ):
+
+        pass
+
 
     def failJob(self, job, wsdefFailed ):
 
@@ -281,7 +313,9 @@ class TKBuildAgent(object):
         artifactFile = wsdef.artifact
         artifactFile = self.replacePathVars( artifactFile, workdirRepoPath, proj, job )
         if not os.path.exists( artifactFile ):
-            logging.warning( f"Artifact file {artifactFile} does not exist.")
+            failMsg = f"Artifact file {artifactFile} does not exist."
+            logging.warning( failMsg )
+            job.lastError = failMsg
             return False
         else:
             logging.info( f"Publishing {artifactFile} to bucket {proj.bucketName}")
@@ -538,7 +572,7 @@ class TKBuildAgent(object):
                         fpLog.flush()
 
                     if job:
-                        job.countError()
+                        job.countError( line )
 
                 elif isWarn:
                     logging.warning(line)

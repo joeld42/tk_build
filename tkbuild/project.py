@@ -28,6 +28,7 @@ class TKBuildProject(object):
         self.icon = None
         self.bucketName = None
         self.sortKey = 1000
+        self.jobDeleteAge = 1440 # Age to auto-delete finished jobs in minutes, default 24 hours
 
         # Now fill in some computed defaults if some things aren't specified
         if self.workDir is None:
@@ -45,6 +46,7 @@ class TKBuildProject(object):
         proj.info_ref = None
         proj.info = None
         proj.sortKey = int(configData.get( "sortKey", 1000 ))
+        proj.jobDeleteAge = int(configData.get("jobDeleteAge", 1440))
 
         if 'workDir' in configData:
             proj.workDir = configData['workDir']
