@@ -1211,20 +1211,29 @@ FRIENDLY_TABLE_NOUNS = {
 '9': ["niner"],
 }
 
+def _buildNameFromList( NAME_TABLE, idchar1, idchar2 ):
+
+    ndx1 = ord(idchar2.lower() )
+    nameKey = idchar1.lower()
+
+    friendlyNameList = NAME_TABLE[ nameKey ]
+    friendlyName = friendlyNameList[ ndx1 % len(friendlyNameList) ]
+
+    if idchar1.isupper():
+      friendlyName = friendlyName.capitalize()
+
+    return friendlyName
+
+
 def friendlyName( idstr ):
 
     while len(idstr) < 4:
         idstr += 'a'
 
-    idlower = idstr.lower()
+    friendlyAdj = _buildNameFromList( FRIENDLY_TABLE_ADJS, idstr[0], idstr[2] )
+    friendlyAnimal = _buildNameFromList( FRIENDLY_TABLE_NOUNS, idstr[1], idstr[2] )
 
-    ndx1 = ord(idlower[2])
-    ndx2 = ord(idlower[3])
-
-    friendlyAdjList = FRIENDLY_TABLE_ADJS[ idlower[0] ]
-    friendlyAnimalList = FRIENDLY_TABLE_NOUNS[idlower[1]]
-
-    id = friendlyAdjList[ ndx1 % len(friendlyAdjList)] + " " + friendlyAnimalList[ ndx2 % len(friendlyAnimalList) ]
+    id =  friendlyAdj + " " + friendlyAnimal
     id = id.replace( " ", "-" )
     result = id + "-" +idstr[:4]
 
