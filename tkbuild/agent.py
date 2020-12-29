@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import os, sys, time, re
+import os, sys, time, re, string
 import datetime, pytz
 import subprocess
+import shutil
 from enum import Enum
 
 import platform
@@ -195,7 +196,7 @@ class TKBuildAgent(object):
         self.cleanupObsoleteJobs()
 
         # Check if there are any jobdirs that do not exist in the job list. If so, clean up those job dirs.
-        # TODO
+        self.cleanupOldJobDirs()
 
         # Check if there are jobs we can do
         for job in self.jobList:
@@ -253,13 +254,51 @@ class TKBuildAgent(object):
 
             self.cleanupOldProjectJobs( proj, projJobExpireDate )
 
-            # Now clean up any workdirs for these (this might not happen
-            # right away because the joblist may not be updated yet)
-            self.cleanupOldJobdirs( proj )
+    def cleanupOldJobDirs(self ):
 
-    def cleanupOldJobdirs(self, proj ):
 
-        pass
+        # Make a list of the jobkeys we have for easy lookup
+        haveJobKeys = set()
+        for job in self.jobList:
+            haveJobKeys.add( job.jobKey )
+
+        # Look in the project workdir for any jobdirs that
+        # match the pattern for a jobdir
+        for proj in self.projects.values():
+            for dir in os.listdir( proj.workDir ):
+                dsplit = dir.split( "_" )
+                if len (dsplit) != 2:
+                    continue
+                dirProj, jobKey = dsplit
+
+
+                if dirProj != proj.projectId:
+                    continue
+
+                if len(jobKey) != 20:
+                    continue
+
+                # At this point we are pretty sure this is a work dir, and
+                # can infer the jobkey from the workdir
+                if jobKey in haveJobKeys:
+                    print ("Nope this is an active job")
+                    continue
+
+                # Also look for other dirs listed in cleanupDirs
+                workDir = os.path.join( proj.workDir, dir )
+                cleanupDirs = [  workDir ]
+                workname = proj.projectId + "_" + jobKey
+                for extraDir in proj.cleanupDirs:
+                    dir2 = self.replacePathVars2( extraDir, workDir, proj, None, workname )
+
+                    # Make sure there are no unexpanded vars, kind of a hack but
+                    if dir2.find("$")==-1:
+                        cleanupDirs.append( dir2 )
+
+                for cleanDir in cleanupDirs:
+                    if os.path.exists( cleanDir ):
+                        logging.info( f"Cleaning up old workdir {cleanDir}" )
+                        shutil.rmtree( cleanDir )
 
 
     def failJob(self, job, wsdefFailed ):
@@ -280,21 +319,28 @@ class TKBuildAgent(object):
         self.commitJobChanges( job )
 
     def replacePathVars(self, origPath, workdirRepoPath, proj, job ):
+        self.replacePathVars2( origPath, workdirRepoPath, proj, job, job.jobDirShort )
+
+    def replacePathVars2(self, origPath, workdirRepoPath, proj, job, workname ):
 
         vars = {
             "TKBUILD" : self.tkbuildDir,
             "WORKDIR" : workdirRepoPath,
             "PROJWORKDIR" : proj.workDir,
-            "COMMIT"  : job.commitVer,
-            "VERSION" : job.version,
-            "BUILDNUM" : str( job.buildNum )
+            "WORKNAME": workname,
         }
+
+        if job:
+            vars.update( {
+                "COMMIT": job.commitVer,
+                "VERSION": job.version,
+                "BUILDNUM": str(job.buildNum)
+            })
 
         result = origPath
         for varname, value in vars.items():
             varstr = "$" + varname
             if result.find( varstr ) != -1:
-                print("SUBST VAR ", varstr, value )
                 result = result.replace( varstr, value )
 
         # result = origPath.replace("$TKBUILD", self.tkbuildDir)
