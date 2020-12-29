@@ -319,7 +319,7 @@ class TKBuildAgent(object):
         self.commitJobChanges( job )
 
     def replacePathVars(self, origPath, workdirRepoPath, proj, job ):
-        self.replacePathVars2( origPath, workdirRepoPath, proj, job, job.jobDirShort )
+        return self.replacePathVars2( origPath, workdirRepoPath, proj, job, job.jobDirShort )
 
     def replacePathVars2(self, origPath, workdirRepoPath, proj, job, workname ):
 
@@ -377,12 +377,28 @@ class TKBuildAgent(object):
             artifactUrl = f"https://storage.googleapis.com/{bucket.name}/{blob.name}"
             logging.info( f"Result of upload is {artifactUrl}")
 
+
             # Make an artifact entry in the DB
             artifact = TKArtifact()
             artifact.project = proj.projectId
             artifact.commitVer = job.commitVer
             artifact.jobKey = job.jobKey
             artifact.builtfile = artifactUrl
+
+            # If the artifact has a manifestBundleId, make a manifest for it
+            if proj.manifestBundleId:
+                artifact.addManifestInfo( proj.manifestAppTitle, proj.manifestBundleId, job.version, job.buildNum, artifactUrl )
+
+                # maybe want to make this more configurable
+                manifestName = f"{proj.projectId}_manifest_{job.version}_build_{job.buildNum}.plist"
+                manifestBlobName = os.path.join( proj.projectId, job.jobKey, manifestName)
+                manifestBlob = bucket.blob( manifestBlobName )
+                result = manifestBlob.upload_from_string( artifact.generateManifestFile())
+
+                manifestUrl = f"https://storage.googleapis.com/{bucket.name}/{manifestBlob.name}"
+                artifact.manifest['manifestURL'] = manifestUrl
+                logging.info( f"Uploaded IOS manifest to {manifestUrl}" )
+
 
             pubArtifactRef = self.db.collection(u'artifacts').document()
             pubArtifactRef.set( artifact.toFirebaseDict() )
@@ -450,12 +466,16 @@ class TKBuildAgent(object):
                         stepCmd = []
                         for stepCmdSplit in wsdef.cmd.split():
 
+                            print ("SPLIT", stepCmdSplit)
+
                             # Replace the project dirs
                             stepCmdSplit = self.replacePathVars( stepCmdSplit, workdirRepoPath, proj, job )
 
                             stepCmd.append( stepCmdSplit )
 
+                        print("step command is ", stepCmd )
                         result, cmdTime = self.echoRunCommand( stepCmd, fpLog, self, job )
+
                     elif wsdef.stepname != 'fetch':
                         # Fetch might not have a cmd, but other steps probably will
                         logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
