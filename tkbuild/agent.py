@@ -182,7 +182,7 @@ class TKBuildAgent(object):
             print("update ...")
             self.serverUpdate()
 
-            self.changeEvent.wait( 5.0  ) # TODO: make timeout time an option
+            self.changeEvent.wait( 60.0  ) # TODO: make timeout time an option
             self.changeEvent.clear()
 
     def serverUpdate(self):
