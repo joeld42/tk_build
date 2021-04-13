@@ -1,6 +1,8 @@
 # flask_web/app.py
 import os, sys
 import pytz
+from functools import wraps
+
 from flask import Flask, render_template, redirect, url_for, request, abort
 
 app = Flask("tk_build",
@@ -9,6 +11,11 @@ app = Flask("tk_build",
 
 from flask.logging import default_handler
 app.logger.removeHandler(default_handler)
+
+from google.auth.transport import requests
+from google.cloud import datastore
+import google.oauth2.id_token
+from firebase_admin import auth
 
 from tkbuild.agent import TKBuildAgent
 from tkbuild.cloud import connectCloudStuff
@@ -20,8 +27,9 @@ from tkbuild.friendlyname import friendlyName
 import logging
 
 agent = None
-
 PST = pytz.timezone('US/Pacific')
+
+firebase_request_adapter = requests.Request()
 
 @app.template_filter('timestamp')
 def format_datetime(date, fmt="%a, %m/%d/%Y %I:%M%p"):
@@ -31,11 +39,36 @@ def format_datetime(date, fmt="%a, %m/%d/%Y %I:%M%p"):
 def format_friendly( idstr ):
     return friendlyName( idstr )
 
+# Helper decorator for pages we want behind a login wall
+def require_login(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check auth
+        id_token = request.cookies.get("token")
+        error_message = None
+        login_data = None
+
+        if id_token:
+            try:
+                # Verify the token against the firebase auth api
+                login_data = google.oauth2.id_token.verify_firebase_token(id_token, firebase_request_adapter)
+            except ValueError as exc:
+                error_message = str(exc)
+
+        # If we have validated login data, call the underlying function
+        if login_data:
+            return f( login_data, *args, **kwargs)
+        else:
+            # Redirect to the login page
+            return redirect( url_for('login', next=request.url ))
+    return decorated_function
+
+
 
 @app.route('/')
-def index():
+@require_login
+def index( login_data  ):
 
-    #projs = agent.projects.values()
     projs = agent.orderedProjects()
 
     # Get all the project info and fetch latest job info
@@ -50,10 +83,31 @@ def index():
                 lastjob[ proj.projectId ] = job
 
 
-    return render_template('index.html', projects=projs, active='projects', lastjob = lastjob )
+    return render_template('index.html', projects=projs, active='projects', lastjob = lastjob,
+                           user_data = login_data )
+
+@app.route('/login')
+def login():
+
+    # Check auth -- this is the same thing that @require_login does but doesn't fail
+    # if not logged in.
+    id_token = request.cookies.get("token")
+    error_message = None
+    login_data = None
+
+    if id_token:
+        try:
+            # Verify the token against the firebase auth api
+            login_data = google.oauth2.id_token.verify_firebase_token( id_token, firebase_request_adapter )
+        except ValueError as exc:
+            error_message = str(exc)
+
+    return render_template('login.html', user_data=login_data, error_message=error_message)
+
 
 @app.route('/jobs')
-def jobs_overview():
+@require_login
+def jobs_overview( login_data ):
 
     jobs_active = []
     jobs_inactive = []
@@ -84,30 +138,38 @@ def jobs_overview():
     jobs_inactive.sort(key=lambda a: a.timestamp, reverse=True)
 
     return render_template('jobs.html',
-                           jobs_active=jobs_active, jobs_inactive=jobs_inactive,
+                           user_data=login_data,
+
+                           jobs_active=jobs_active,
+
+                           jobs_inactive=jobs_inactive,
                            projects=agent.projects.keys(),
                            wsstyles=wsstyles, agent=agent, allwsnames = allwsnames,
                            active='jobs')
 
 @app.route('/job_details/<jobkey>' )
-def job_details( jobkey ):
+@require_login
+def job_details( login_data, jobkey ):
 
     jobRef = agent.db.collection(u'jobs').document( jobkey ).get()
+
     #if jobRef.ex
     jobDict = jobRef.to_dict()
     proj = agent.projects.get( jobDict['projectId'] )
 
     job = TKBuildJob.createFromFirebaseDict( proj, jobRef.id, jobRef )
-    return render_template( 'job_details.html', job=job )
+    return render_template( 'job_details.html', user_data = login_data, job=job  )
 
 @app.route('/del_job/<jobkey>' )
-def del_job( jobkey ):
+@require_login
+def del_job( login_data, jobkey ):
 
     agent.db.collection(u'jobs').document( jobkey ).delete()
     return redirect(url_for('jobs_overview'))
 
 @app.route('/builds')
-def builds_overview():
+@require_login
+def builds_overview( login_data ):
 
     # Fetch the build artifacts
     artifacts = {}
@@ -126,9 +188,10 @@ def builds_overview():
     for pk in artifacts.keys():
         artifacts[ pk ].sort( key=lambda a: a.timestamp, reverse=True )
 
-    return render_template('builds.html', projects=agent.orderedProjects(), artifacts=artifacts, active='builds' )
+    return render_template('builds.html', user_data = login_data, projects=agent.orderedProjects(), artifacts=artifacts, active='builds' )
 
 @app.route('/project/<project_id>' )
+@require_login
 def project_overview( project_id ):
     proj = agent.projects.get(project_id)
     if proj == None:
@@ -137,7 +200,8 @@ def project_overview( project_id ):
     return
 
 @app.route('/project/<project_id>/refresh_repo' )
-def project_refresh_repo( project_id ):
+@require_login
+def project_refresh_repo( login_data, project_id ):
 
     proj = agent.projects.get( project_id )
     if proj == None:
@@ -146,11 +210,12 @@ def project_refresh_repo( project_id ):
     wsdef = proj.getFetchWorkstep()
     agent.updatePristineRepo( proj, wsdef, None )
 
-    return redirect(url_for('project_add_job', project_id=project_id) )
+    return redirect(url_for('project_add_job',  user_data = login_data, project_id=project_id) )
 
 
 @app.route('/project/<project_id>/add_job', methods=[ 'POST', 'GET'])
-def project_add_job( project_id ):
+@require_login
+def project_add_job( login_data, project_id ):
 
     proj = agent.projects.get( project_id )
     if proj == None:
@@ -185,9 +250,13 @@ def project_add_job( project_id ):
     for wsdef in proj.workstepDefs:
         wsnames.append( wsdef.stepname )
 
-    return render_template( "project_add_job.html", project=proj, commits=commitList, wsnames=wsnames )
+    return render_template( "project_add_job.html",
+                            user_data=login_data,
+                            project=proj, commits=commitList, wsnames=wsnames )
+
 
 @app.route('/add_test_job', methods=[ 'POST'])
+@require_login
 def add_test_job():
 
     print("ADD JOB: will add ", request.form.to_dict() )

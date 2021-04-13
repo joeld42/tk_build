@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}TKBuild Login{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+<div class="row">
+
+    <div class="col">
+
+    {% if error_message %}
+        <div class="alert alert-warning" role="alert">
+            Login Error: {{ error_message }}
+        </div>
+    {% endif %}
+
+    {% if user_data %}
+        <div class="card">
+          <h5 class="card-header">Signed In</h5>
+          <div class="card-body">
+                <center>
+                <img class="profile-pic-big" src="{{ user_data['picture'] }}"><br>
+                <p class="card-text">You are signed in as {{ user_data['name'] }} ({{ user_data['email'] }}).</p>
+                </center>
+              <hr>
+            <a href="{{ url_for('login') }}" class="btn btn-primary" onclick="tkbuild_auth_signoff();">Sign Out</a><br>
+            <a href="{{ url_for('index') }}">Return to TKBuild Main page</a>
+          </div>
+        </div>
+    {% endif %}
+
+    <div id="firebaseui-auth-container"></div>
+
+    </div>
+
+</div>
+{% endblock %}

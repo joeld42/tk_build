@@ -4,8 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TKBuild</title>
+
+    <!-- firebase auth -->
+    <script src="https://www.gstatic.com/firebasejs/ui/4.4.0/firebase-ui-auth.js"></script>
+    <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/4.4.0/firebase-ui-auth.css" />
+
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/css/bootstrap.min.css" integrity="sha384-r4NyP46KrjDleawBgD5tp8Y7UzmLA05oM1iAEQ17CSuDqnUK2+k9luXQOfXJCJ4I" crossorigin="anonymous">
-    <link rel="stylesheet" href="static/css/tkbuild.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tkbuild.css') }}">
+    <script src="{{ url_for('static', filename='js/tkbuild_auth.js') }}"></script>
 </head>
 <body>
 
@@ -23,24 +29,27 @@
           <input class="form-control form-control-dark" type="text" placeholder="Search" aria-label="Search">
       </div>
       <div class="col-12 col-md-5 col-lg-8 d-flex align-items-center justify-content-md-end mt-3 mt-md-0">
-          <div class="mr-3 mt-1">
-              <a class="github-button" href="https://github.com/themesberg/simple-bootstrap-5-dashboard" data-color-scheme="no-preference: dark; light: light; dark: light;" data-icon="octicon-star" data-size="large" data-show-count="true" aria-label="Star /themesberg/simple-bootstrap-5-dashboard">Star</a>
-          </div>
+
+          {% if user_data %}
           <div class="dropdown">
               <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-expanded="false">
-                Hello, John Doe
+                  <img class="profile-pic" src="{{ user_data['picture'] }}">
+                {{ user_data['name'] }}
               </button>
               <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                 <li><a class="dropdown-item" href="#">Settings</a></li>
                 <li><a class="dropdown-item" href="#">Messages</a></li>
-                <li><a class="dropdown-item" href="#">Sign out</a></li>
+                <li><a class="dropdown-item" href="#" onclick="tkbuild_auth_signoff();">Sign out</a></li>
               </ul>
             </div>
+          {% endif %}
       </div>
     </nav>
 
     <!-- sidebar and main layout -->
     <div class="container-fluid">
+
+
       <div class="row">
           <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
 
@@ -96,5 +105,33 @@
 
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha1/js/bootstrap.min.js" integrity="sha384-oesi62hOLfzrys4LxRF63OJCXdXDipiYWBnvTl9Y9/TRlw5xlKIEHpNyvvDShgf/" crossorigin="anonymous"></script>
+
+
+    <!-- The core Firebase JS SDK is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/8.4.1/firebase-app.js"></script>
+
+    <!-- TODO: Add SDKs for Firebase products that you want to use
+         https://firebase.google.com/docs/web/setup#available-libraries -->
+    <script src="https://www.gstatic.com/firebasejs/8.4.1/firebase-analytics.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/7.8.0/firebase-auth.js"></script>
+
+    <script>
+      // Your web app's Firebase configuration
+      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+      var firebaseConfig = {
+        apiKey: "AIzaSyCOAHF5-egBP4GhwTFIivH1bKI-ESGlq4w",
+        authDomain: "rising-environs-295900.firebaseapp.com",
+        databaseURL: "https://rising-environs-295900.firebaseio.com",
+        projectId: "rising-environs-295900",
+        storageBucket: "rising-environs-295900.appspot.com",
+        messagingSenderId: "67077352803",
+        appId: "1:67077352803:web:a2391427fe70c7ca1cb756",
+        measurementId: "G-5L3P9PQ1P5"
+      };
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+      firebase.analytics();
+    </script>
+
 </body>
 </html>
