@@ -19,7 +19,7 @@ window.addEventListener('load', function () {
 
     ],
     // Terms of service url.
-    tosUrl: '<your-tos-url>'
+    //tosUrl: '<your-tos-url>'
   };
 
   firebase.auth().onAuthStateChanged(function (user) {
@@ -34,7 +34,7 @@ window.addEventListener('load', function () {
         // SECURITY NOTE: As cookies can easily be modified, only put the
         // token (which is verified server-side) in a cookie; do not add other
         // user information.
-        document.cookie = "token=" + token;
+        document.cookie = "token=" + token + "; path=/;";
       });
     } else {
       // User is signed out.
@@ -46,7 +46,7 @@ window.addEventListener('load', function () {
       //document.getElementById('sign-out').hidden = true;
       //document.getElementById('login-info').hidden = true;
       // Clear the token cookie.
-      document.cookie = "token=";
+      document.cookie = "token=; path=/;";
     }
   }, function (error) {
     console.log(error);
@@ -58,5 +58,6 @@ window.addEventListener('load', function () {
 function tkbuild_auth_signoff()
 {
   firebase.auth().signOut();
+  document.cookie = "token=";
 
 }

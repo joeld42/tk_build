@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}TKBuild -- {{ user.authUser.display_name }}{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+<div class="row">
+
+    <div class="col">
+
+    {% if error_message %}
+        <div class="alert alert-warning" role="alert">
+            Error: {{ error_message }}
+        </div>
+    {% endif %}
+
+        {% if success_message %}
+        <div class="alert alert-success" role="alert">
+            {{ success_message }}
+        </div>
+    {% endif %}
+
+    <h3>{{ user.authUser.display_name }}</h3>
+
+        <form action="{{ url_for('edit_user', userId=user.authUser.uid ) }}" method="post">
+
+            <div class="mb-3">
+                <label class="form-label">User Role</label><br>
+
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="radioUserRole" id="radioUserRoleGuest"
+                         value="guest" {% if user.getRole()=='guest' %}checked{% endif %} >
+                  <label class="form-check-label" for="radioUserRoleGuest">Guest</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="radioUserRole" id="radioUserRoleTester"
+                         value="tester" {% if user.getRole()=='tester' %}checked{% endif %}>
+                  <label class="form-check-label" for="radioUserRoleTester">Tester</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="radioUserRole" id="radioUserRoleAdmin"
+                         value="admin" {% if user.getRole()=='admin' %}checked{% endif %}>
+                  <label class="form-check-label" for="radioUserRoleAdmin">Admin</label>
+                </div>
+
+            </div>
+
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+        <a href="{{ url_for('index') }}">Return to TKBuild Main page</a>
+
+
+    </div>
+</div>
+{% endblock %}

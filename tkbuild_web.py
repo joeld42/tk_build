@@ -20,6 +20,7 @@ from firebase_admin import auth
 from tkbuild.agent import TKBuildAgent
 from tkbuild.cloud import connectCloudStuff
 from tkbuild.job import TKBuildJob, TKWorkstepDef, ActiveStatus
+from tkbuild.user import TKBuildUser, UserRole, validateRole
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
 from tkbuild.friendlyname import friendlyName
@@ -57,11 +58,45 @@ def require_login(f):
 
         # If we have validated login data, call the underlying function
         if login_data:
-            return f( login_data, *args, **kwargs)
+            return f(login_data, *args, **kwargs)
         else:
             # Redirect to the login page
-            return redirect( url_for('login', next=request.url ))
+            return redirect(url_for('login', next=request.url))
+
     return decorated_function
+
+def require_role( role = UserRole.TESTER ):
+    def require_role_decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # Check auth
+            id_token = request.cookies.get("token")
+            error_message = None
+            login_data = None
+
+            if id_token:
+                try:
+                    # Verify the token against the firebase auth api
+                    login_data = google.oauth2.id_token.verify_firebase_token(id_token, firebase_request_adapter)
+                except ValueError as exc:
+                    error_message = str(exc)
+
+            #print("require_role, login data is ", login_data, "id token is ", id_token )
+
+            # If we have validated login data, call the underlying function
+            if login_data:
+                # if this requires a specific role, validate that role first
+                if validateRole( login_data, role ):
+                    return f(login_data, *args, **kwargs)
+                else:
+                    # Redirect to the main page
+                    return redirect(url_for('index'))
+            else:
+                # Redirect to the login page
+                return redirect( url_for('login', next=request.url ))
+
+        return decorated_function
+    return require_role_decorator
 
 
 
@@ -103,6 +138,51 @@ def login():
             error_message = str(exc)
 
     return render_template('login.html', user_data=login_data, error_message=error_message)
+
+
+@app.route('/users')
+@require_role( role=UserRole.ADMIN )
+def users( login_data ):
+
+    users = []
+    for authUser in auth.list_users().iterate_all():
+        user = TKBuildUser( authUser )
+        users.append( user )
+
+    users.sort( key=lambda u: u.authUser.display_name )
+
+    return render_template('users.html',
+                           user_data=login_data,
+                           active='users',
+                           users = users );
+
+@app.route('/user/<userId>/edit', methods=[ 'POST', 'GET'])
+@require_role( role=UserRole.ADMIN )
+def edit_user( login_data, userId ):
+    error_message = None
+    success_message = None
+    user = None
+    authUser = auth.get_user(userId)
+    if authUser:
+        user = TKBuildUser( authUser )
+
+
+    if request.method == 'POST':
+        userRole = request.form.get('radioUserRole')
+
+        if not userRole in [ UserRole.GUEST, UserRole.TESTER, UserRole.ADMIN ]:
+            error_message = "Unknown user role : " + str(userRole)
+            print( "WARN: " + error_message )
+        else:
+            auth.set_custom_user_claims( user.authUser.uid, { 'role' : userRole } )
+            success_message = f"Set role to '{userRole}' for {user.authUser.display_name}"
+
+    return render_template('edit_user.html',
+                           active='users',
+                           user = user,
+                           error_message = error_message,
+                           success_message=success_message,
+                           user_data=login_data );
 
 
 @app.route('/jobs')
@@ -176,7 +256,7 @@ def builds_overview( login_data ):
     artifactsData = agent.db.collection(u'artifacts').get()
     for artifactData in artifactsData:
 
-        print( "ArtifactData is ", artifactData.to_dict() )
+        #print( "ArtifactData is ", artifactData.to_dict() )
 
         artifact = TKArtifact.createFromFirebaseDict( artifactData.id, artifactData.to_dict() )
         if not artifact.project in artifacts:
@@ -252,6 +332,7 @@ def project_add_job( login_data, project_id ):
 
     return render_template( "project_add_job.html",
                             user_data=login_data,
+                            active='jobs',
                             project=proj, commits=commitList, wsnames=wsnames )
 
 

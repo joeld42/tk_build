@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}TKBuild Users{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+<div class="row">
+
+    <div class="col">
+
+    {% if error_message %}
+        <div class="alert alert-warning" role="alert">
+            Error: {{ error_message }}
+        </div>
+    {% endif %}
+
+    <h3>Current Users</h3>
+
+            {% for user in users %}
+            <div class="row">
+                <div class="col-3 gy-3">
+                    <h5>
+                    <img class="profile-pic" src="{{ user.authUser.photo_url }}">
+                    {{ user.authUser.display_name }}</h5>
+                </div>
+
+                <div class="col-4 gy-3"">
+                    {{ user.authUser.email }}
+                    {% if not user.authUser.email_verified %}
+                        <span class="badge bg-warning text-dark">Unverified</span>
+                    {% endif %}
+                </div>
+
+                <div class="col-2 gy-3">
+                    {% if user.getRole() == 'admin' %}
+                    <span class="badge bg-info">
+                    {% elif user.getRole() == 'tester' %}
+                    <span class="badge bg-primary">
+                    {% elif user.getRole() == 'guest' %}
+                    <span class="badge bg-secondary">
+                    {% endif %}
+                    {{ user.getRoleName() }}</span>
+                </div>
+
+                <div class="col-3 gy-3"">
+                    <a href="{{ url_for('edit_user', userId=user.authUser.uid ) }}" class="btn btn-outline-primary btn-sm" type="button">Edit</a>
+                </div>
+
+            </div>
+            {% endfor %}
+
+            <a href="{{ url_for('index') }}">Return to TKBuild Main page</a>
+    </div>
+</div>
+{% endblock %}
