@@ -236,9 +236,41 @@ def job_details( login_data, jobkey ):
     #if jobRef.ex
     jobDict = jobRef.to_dict()
     proj = agent.projects.get( jobDict['projectId'] )
+    logs = {} # Logs for the worksteps we know about
+    extra_logs = {} # These are logs that don't match a workstep that we expect
+
+    wsnames = []
+    for wsdef in proj.workstepDefs:
+        wsnames.append(wsdef.stepname)
+    if proj.bucketName:
+        storage_client = google.cloud.storage.Client()
+        logPath = os.path.join(proj.projectId, jobkey, "logs/" )
+        blobs = storage_client.list_blobs( proj.bucketName, prefix=logPath, delimiter='/')
+        blobs = list(blobs)
+        #print("Bucket", proj.bucketName, "log path", logPath )
+        #print("Blobs:", blobs)
+
+        for blob in blobs:
+            logname = blob.name
+            #logUrl = f"https://storage.googleapis.com/{proj.bucketName}/{blob.name}"
+            logUrl = f"https://{proj.bucketName}.storage.googleapis.com/{blob.name}"
+
+            # Simplify the logfile name if it matches our expected convention
+            # of project_jobkey_workstep, we can strip the project and jobkey
+            jobKeyPos = logname.rfind( jobkey )
+            if jobKeyPos >= 0:
+                logname = logname[ jobKeyPos + len(jobkey) + 1 :]
+
+            if logname in wsnames:
+                logs[logname] = logUrl
+            else:
+                # this is either an extra file in the log dir or a workstep log that
+                # isn't defined in the project
+                extra_logs[logname] = logUrl
+            #print("Log:", logname )
 
     job = TKBuildJob.createFromFirebaseDict( proj, jobRef.id, jobRef )
-    return render_template( 'job_details.html', user_data = login_data, job=job  )
+    return render_template( 'job_details.html', user_data = login_data, proj=proj, job=job, logfiles = logs, extralogs = extra_logs  )
 
 @app.route('/del_job/<jobkey>' )
 @require_login

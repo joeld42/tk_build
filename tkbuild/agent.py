@@ -23,6 +23,11 @@ from tkbuild.job import TKBuildJob, TKWorkstepDef, JobStatus
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
 
+# TKBUILD TODO
+#  - Add build tags to builds to filter agents (e.g. win32, dev)
+#  - Figure out "voting" or transaction based write for firebase to ensure only one agent runs a job
+#  - Figure out reliable way to stop/resume build agent on mac
+
 class TKBuildAgentConfig(object):
 
     def __init__(self, agentConfigFile):
@@ -318,6 +323,33 @@ class TKBuildAgent(object):
 
         self.commitJobChanges( job )
 
+    def archiveLog(self, job, wsdef, workstepLog ):
+        proj = self.projects[job.projectId]
+
+        # Check that we're configured to publish stuff
+        if not proj.bucketName:
+            logging.warning("archiveLog: No bucketName set in project, can't archive log.")
+            return False
+
+        # Make sure the file exists
+        if not os.path.exists(workstepLog):
+            logging.warning( f"archiveLog: Workstep log file {workstepLog} does not exist." )
+            return False
+        else:
+            logging.info(f"Archiving {workstepLog} to bucket {proj.bucketName}")
+            if self.storage_client is None:
+                self.storage_client = google.cloud.storage.Client()
+
+            logFilename = os.path.split(workstepLog)[-1]
+            bucket = self.storage_client.bucket(proj.bucketName)
+            blobName = os.path.join(proj.projectId, job.jobKey, "logs", logFilename)
+            blob = bucket.blob(blobName)
+            result = blob.upload_from_filename(workstepLog, content_type="text/plain;charset=UTF-8")
+
+            logArchiveUrl = f"https://{bucket.name}.storage.googleapis.com/{blob.name}"
+            logging.info(f"Result of upload is {logArchiveUrl}")
+
+
     def replacePathVars(self, origPath, workdirRepoPath, proj, job ):
         return self.replacePathVars2( origPath, workdirRepoPath, proj, job, job.jobDirShort )
 
@@ -466,7 +498,7 @@ class TKBuildAgent(object):
                         stepCmd = []
                         for stepCmdSplit in wsdef.cmd.split():
 
-                            print ("SPLIT", stepCmdSplit)
+                            #print ("SPLIT", stepCmdSplit)
 
                             # Replace the project dirs
                             stepCmdSplit = self.replacePathVars( stepCmdSplit, workdirRepoPath, proj, job )
@@ -505,7 +537,14 @@ class TKBuildAgent(object):
                         # Step failed, fail the whole job :_(
                         self.failJob( job, wsdef )
 
-                    break
+                # Workstep finished, archive the log file
+                self.archiveLog(job, wsdef, workstepLog)
+
+                # we did one workstep here, so don't keep looking for available ones. We'll
+                # get the next one the next time through the loop
+                break
+
+
 
     def makePristineRepoPath(self, proj ):
         pristineRepoPath = os.path.join(proj.projectDir, proj.projectId + "_pristine")

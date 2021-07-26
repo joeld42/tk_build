@@ -42,7 +42,11 @@ def connectCloudStuff( agent, do_cloud_logging ):
     if do_cloud_logging:
         # logger = logging_client.logger("tkbuild-agent-" + agent.name )
         logging_client = google.cloud.logging.Client( )
-        logging_handler = google.cloud.logging.handlers.CloudLoggingHandler(logging_client, name="tkbuild-agent-" + agent.name )
+
+        logname = "tkbuild-agent-" + agent.name
+        print("Log name is :", logname )
+
+        logging_handler = google.cloud.logging.handlers.CloudLoggingHandler(logging_client, name=logname )
         google.cloud.logging.handlers.setup_logging( logging_handler )
 
         # Also echo to stdout
@@ -56,6 +60,7 @@ def connectCloudStuff( agent, do_cloud_logging ):
         rootLogger.addHandler(stdoutHandler)
 
     else:
+        print("Cloud logging is off")
         # Just run with stdout logging for testing
         logging.basicConfig( level=logging.INFO )
 

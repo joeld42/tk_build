@@ -49,3 +49,15 @@
 .profile-pic-big {
     border-radius: 50%;
 }
+
+.logviewer {
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    background-color: #eef;
+    margin-top: 32px;
+    padding: 5px;
+    white-space: pre-line;
+    font-size: 10pt;
+    overflow-wrap: anywhere;
+    overflow: auto;
+}
