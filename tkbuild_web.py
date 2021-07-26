@@ -233,11 +233,17 @@ def job_details( login_data, jobkey ):
 
     jobRef = agent.db.collection(u'jobs').document( jobkey ).get()
 
-    #if jobRef.ex
     jobDict = jobRef.to_dict()
     proj = agent.projects.get( jobDict['projectId'] )
     logs = {} # Logs for the worksteps we know about
     extra_logs = {} # These are logs that don't match a workstep that we expect
+
+    # See if there's an artifact for this job
+    artifact = None
+    artsRef = agent.db.collection(u'artifacts')
+    for artifactData in artsRef.where( u'jobKey', u'==', jobkey ).get():
+        
+        artifact = TKArtifact.createFromFirebaseDict( artifactData.id, artifactData.to_dict() )
 
     wsnames = []
     for wsdef in proj.workstepDefs:
@@ -270,7 +276,7 @@ def job_details( login_data, jobkey ):
             #print("Log:", logname )
 
     job = TKBuildJob.createFromFirebaseDict( proj, jobRef.id, jobRef )
-    return render_template( 'job_details.html', user_data = login_data, proj=proj, job=job, logfiles = logs, extralogs = extra_logs  )
+    return render_template( 'job_details.html', user_data = login_data, proj=proj, job=job, artifact=artifact, logfiles = logs, extralogs = extra_logs  )
 
 @app.route('/del_job/<jobkey>' )
 @require_login
