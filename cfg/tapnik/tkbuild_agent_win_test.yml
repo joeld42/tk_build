@@ -1,0 +1,42 @@
+---
+# Config file for tkbuild worker/agent node
+build-agent:
+  name: spaceheater
+  desc: Joel windows build agent
+  tags: windows
+  gcloud:
+    credfile: c:/Toolkits/tk_build/cfg/keys/firestore-key.json
+    project-id: rising-environs-295900
+  
+projects:
+
+  - project:
+      projectId: tkwordlist
+      projectDir: "c:/tkbuild/tk_wordlist/"
+      workDir: "c:/tkbuild/tk_wordlist/workdir"
+      icon: "/imgs/icon_tkwordlist_167.png"
+      jobDeleteAge: 1440
+      sortKey: 2
+      worksteps:
+        - name: "fetch"
+          repoUrl: "https://github.com/joeld42/tk_wordlist.git"
+        - name: "build"
+          cmd: "$TKBUILD/tkwordlist_build.sh $WORKDIR"
+
+  - project:
+      projectId: testrepo
+      projectDir: "c:/tkbuild/testrepo/"
+      icon: "/imgs/icon_testrepo_167.png"
+      bucketName: tkbuild-artifacts
+      jobDeleteAge: 1440
+      sortKey: 3
+      worksteps:
+        - name: "fetch"
+          repoUrl: "https://github.com/joeld42/testrepo.git"
+          cmd: "echo will do extra fetch stuff here"
+        - name: "build"
+          cmd: "$TKBUILD/testrepo_build.sh $WORKDIR $COMMIT $BUILDNUM"
+          peekVersion : "$WORKDIR/version.txt"
+        - name: "package"          
+          cmd: "$TKBUILD/testrepo_package.sh $WORKDIR $VERSION $BUILDNUM"
+          artifact: "$WORKDIR/testrepo_$VERSION_build_$BUILDNUM.zip"

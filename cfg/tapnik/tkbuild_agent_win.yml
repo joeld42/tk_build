@@ -1,19 +1,19 @@
 ---
 # Config file for tkbuild worker/agent node
 build-agent:
-  name: pareidolia
-  desc: Joel macbook build agent
-  tags: macos
+  name: spaceheater
+  desc: Joel windows build agent
+  tags: windows
   gcloud:
-    credfile: /Users/joeld/cfg/firestore-key.json
+    credfile: c:/Toolkits/tk_build/cfg/keys/firestore-key.json
     project-id: rising-environs-295900
   
 projects:
 
   - project:
       projectId: tkwordlist
-      projectDir: "/opt/tkbuild/tk_wordlist/"
-      workDir: "/opt/tkbuild/tk_wordlist/workdir"
+      projectDir: "c:/tkbuild/tk_wordlist/"
+      workDir: "c:/tkbuild/tk_wordlist/workdir"
       icon: "/imgs/icon_tkwordlist_167.png"
       jobDeleteAge: 1440
       sortKey: 2
@@ -25,7 +25,7 @@ projects:
 
   - project:
       projectId: testrepo
-      projectDir: "/opt/tkbuild/testrepo/"
+      projectDir: "c:/tkbuild/testrepo/"
       icon: "/imgs/icon_testrepo_167.png"
       bucketName: tkbuild-artifacts
       jobDeleteAge: 1440
@@ -43,7 +43,7 @@ projects:
 
   - project:
       projectId: civclicker
-      projectDir: "/opt/tkbuild/civclicker"
+      projectDir: "c:/tkbuild/civclicker"
       icon: "/imgs/icon_civclicker_167.png"
       bucketName: tkbuild-artifacts
       jobDeleteAge: 10080

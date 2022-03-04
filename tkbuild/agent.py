@@ -22,6 +22,7 @@ import logging
 from tkbuild.job import TKBuildJob, TKWorkstepDef, JobStatus
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
+from tkbuild.agentinfo import TKAgentInfo, AgentStatus
 
 # TKBUILD TODO
 #  - Add build tags to builds to filter agents (e.g. win32, dev)
@@ -78,6 +79,11 @@ class TKBuildAgent(object):
 
         # This is the currently running job.
         self.currentJob = None
+
+        # This is our current server status
+        self.agentInfo = None
+
+
 
     @classmethod
     def createFromConfig( cls, configData, tkBuildDir ):
@@ -187,8 +193,39 @@ class TKBuildAgent(object):
             print("update ...")
             self.serverUpdate()
 
-            self.changeEvent.wait( 60.0  ) # TODO: make timeout time an option
+
+            self.changeEvent.wait( 2.0  ) # TODO: make timeout time an option
+
+
             self.changeEvent.clear()
+
+    def updateCurrentStatus(self, status ):
+
+        # TODO don't update if status is unchanged below a timeout
+
+        # If we don't have a ref to our agent info, fetch or create one
+        if self.agentInfo is None:
+            agents_ref = self.db.collection(u'agents')
+            agents = agents_ref.where(u'name', u'==', self.name ).get()
+
+            print("Agents are", agents)
+            if (len(agents) > 0):
+                agentRef = agents[0].reference
+                print(f"Found agent {self.name}")
+            else:
+                # Create a new agentInfo
+                print(f"Did not find agent with name {self.name}, creating new")
+                agentRef = self.db.collection(u'agents').document()
+
+            self.agentInfo = TKAgentInfo( self.name, self.desc, agentRef.id )
+        else:
+            agentRef = self.db.collection(u'agents').document( self.agentInfo.id )
+
+
+        agentData = self.agentInfo.toFirebaseDict()
+        agentRef.set( agentData )
+
+
 
     def serverUpdate(self):
 
@@ -196,6 +233,9 @@ class TKBuildAgent(object):
         self.updCount += 1
 
         print( f" {len(self.jobList)} avail jobs:")
+
+        # Report our status to the server
+        self.updateCurrentStatus( AgentStatus.IDLE )
 
         # Check if there are any obsolete jobs, and delete them
         self.cleanupObsoleteJobs()
@@ -270,6 +310,11 @@ class TKBuildAgent(object):
         # Look in the project workdir for any jobdirs that
         # match the pattern for a jobdir
         for proj in self.projects.values():
+
+            if (not os.path.exists( proj.workDir)):
+                print(f"Workdir for {proj.projectId} does not exist, skipping.")
+                continue
+
             for dir in os.listdir( proj.workDir ):
                 dsplit = dir.split( "_" )
                 if len (dsplit) != 2:

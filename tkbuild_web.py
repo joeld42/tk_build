@@ -24,6 +24,7 @@ from tkbuild.user import TKBuildUser, UserRole, validateRole
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
 from tkbuild.friendlyname import friendlyName
+from tkbuild.agentinfo import TKAgentInfo, AgentStatus
 
 import logging
 
@@ -184,6 +185,23 @@ def edit_user( login_data, userId ):
                            success_message=success_message,
                            user_data=login_data );
 
+@app.route('/agents')
+@require_login
+def agents_overview( login_data ):
+
+    agents = []
+
+    agentsData = agent.db.collection(u'agents').get()
+    print("Agents data", agentsData )
+    for agentData in agentsData:
+        agentInfo = TKAgentInfo.createFromFirebaseDict( agentData.id, agentData )
+
+        agents.append(  agentInfo )
+
+    return render_template( 'agents.html',
+                            user_data=login_data,
+                            active='agents',
+                            agents=agents )
 
 @app.route('/jobs')
 @require_login
@@ -425,6 +443,7 @@ def makeReadyWebApp( cfgFile, do_cloud_logging ):
 if __name__ == '__main__':
 
     # TODO get this from environment or args
-    agentCfgFile = "/opt/tkbuild/tkbuild_agent.yml"
+    #agentCfgFile = "/opt/tkbuild/tkbuild_agent.yml"
+    agentCfgFile = "c:/Toolkits/tk_build/cfg/tapnik/tkbuild_agent_win_test.yml"
     makeReadyWebApp( agentCfgFile, False )
     app.run(debug=True, host='0.0.0.0')

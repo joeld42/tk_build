@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}TKBuild Agents{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+
+<div class="row">
+    <div class="col">
+
+    {% if error_message %}
+        <div class="alert alert-warning" role="alert">
+            Error: {{ error_message }}
+        </div>
+    {% endif %}
+
+    <h3>Build Agents</h3>
+
+            {% for agent in agents %}
+            <div class="row">
+                <div class="col-3 gy-3">
+                    <h5>{{agent.name}}</h5> ({{agent.desc}}) {{ agent.status }}
+                </div>
+
+
+            </div>
+            {% endfor %}
+
+            <a href="{{ url_for('index') }}">Return to TKBuild Main page</a>
+    </div>
+</div>
+{% endblock %}
