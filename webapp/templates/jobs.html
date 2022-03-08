@@ -36,7 +36,10 @@
             </div>
 
             <div class="card-body">
-
+                <p>Tags: {% for tag in job.tags %}
+                    {{tag}}
+                    {% endfor %}
+                </p>
               <p>Build from commit {{ job.commitVer }}</p>
                 <p>Steps:
                 {% for ws in job.wsnames %}

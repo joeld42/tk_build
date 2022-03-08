@@ -16,11 +16,16 @@
     <div class="col-md-6">
         <p><strong>JobKey:</strong> {{ job.jobKey }}</p>
         <p><strong>Project:</strong> {{ job.projectId }}</p>
+        <p><strong>Tags:</strong> {% for tag in job.tags %}
+            {{ tag }}
+            {% endfor %}
+        </p>
         <p><strong>Errors/Warnings:</strong>
             {% if job.errorCount %}<span class="badge bg-danger">{{ job.errorCount }} Errors</span>{% endif %}
             {% if job.warnCount %}<span class="badge bg-warning text-dark">{{ job.warnCount }} Warnings</span>{% endif %}
             {% if job.errorCount == 0 and job.warnCount == 0 %}None.{% endif%}
         </p>
+
     </div>
 
     <div class="col-md-6">
