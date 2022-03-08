@@ -14,7 +14,6 @@ DEFAULT_CONFIG_FILE = "/opt/tkbuild/tkbuild_agent.yml"
 # - Generate link to jump to log or bucket in cloud console easily from tkbuild_web
 # - Embed log view (query log directly?)
 # - Tag/search log entries by job/workstep as well as just agent
-# - Use google's auth stuff or add a simple password
 
 if __name__=='__main__':
 

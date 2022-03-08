@@ -3,7 +3,7 @@
 build-agent:
   name: spaceheater
   desc: Joel windows build agent
-  tags: windows
+  tags: win
   gcloud:
     credfile: c:/Toolkits/tk_build/cfg/keys/firestore-key.json
     project-id: rising-environs-295900

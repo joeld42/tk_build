@@ -37,6 +37,7 @@ class TKBuildJob(object ):
         self.platform = "Unknown"
         self.jobKey = jobKey
         self.projectId = project.projectId
+        self.tags = []
         self.commitVer = "1234"
         self.errorCount = 0
         self.warnCount = 0
@@ -153,6 +154,7 @@ class TKBuildJob(object ):
             "worksteps" : self.worksteps,
             "version" : self.version,
             "buildNum" : self.buildNum,
+            "tags" : self.tags,
             "timestamp": SERVER_TIMESTAMP if self.timestamp is None else self.timestamp
         }
 
@@ -178,6 +180,8 @@ class TKBuildJob(object ):
 
         # Worksteps is a string : string dict in both, no conversion needed
         job.worksteps =jobDict.get( 'worksteps' )
+
+        job.tags = jobDict.get( 'tags')
 
         job.jobDirShort = job.projectId + "_" + jobKey
 

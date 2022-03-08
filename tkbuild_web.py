@@ -1,6 +1,6 @@
 # flask_web/app.py
 import os, sys
-import pytz
+import datetime, pytz
 from functools import wraps
 
 from flask import Flask, render_template, redirect, url_for, request, abort
@@ -24,7 +24,7 @@ from tkbuild.user import TKBuildUser, UserRole, validateRole
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
 from tkbuild.friendlyname import friendlyName
-from tkbuild.agentinfo import TKAgentInfo, AgentStatus
+from tkbuild.agentinfo import TKAgentInfo, AgentStatus, DEFAULT_AGENT_TIMESTAMP
 
 import logging
 
@@ -36,6 +36,29 @@ firebase_request_adapter = requests.Request()
 @app.template_filter('timestamp')
 def format_datetime(date, fmt="%a, %m/%d/%Y %I:%M%p"):
     return date.astimezone(PST).strftime(fmt)
+
+# Formats a timestamp as a readable age, such as "5 minutes ago"
+# or " `Date`". Times before the existance of tk_build are
+# considered "Never"
+@app.template_filter('agestamp')
+def format_agestamp( date ):
+    if date <= DEFAULT_AGENT_TIMESTAMP:
+        return "Never"
+    else:
+        tdelta = datetime.datetime.now().astimezone(pytz.UTC) - date
+        if tdelta.seconds >= 3600:
+            # if more than an hour has passed, show it as a regular timestamp
+            return date.astimezone(PST).strftime("%a, %m/%d/%Y %I:%M%p")
+        else:
+            if tdelta.seconds > 60:
+                return f"{ round(tdelta.seconds / 60) } minutes ago"
+            elif tdelta.seconds >= 10:
+                return f"{ round(tdelta.seconds) } seconds ago"
+            else:
+                return "just now"
+
+
+
 
 @app.template_filter('friendly')
 def format_friendly( idstr ):
@@ -357,12 +380,29 @@ def project_add_job( login_data, project_id ):
     if proj == None:
         abort(404, description=f"Project '{project_id}' does not exist.")
 
+    # TODO: Get the from, the config somehow
+    # Internally, platform tags are just regular tags but we make the UI expect
+    # exactly one platform tag and the misc tags con from the config
+    PLATFORM_TAGS = ['win', 'mac', 'ios']
+    MISC_TAGS = ['testing', 'blarg', 'foo']
+
     if request.method == 'POST':
         commit = request.form.get('commit')
         if commit:
             # Submitting, add the project
             addJob = TKBuildJob(proj)
             addJob.commitVer = commit.split()[0]
+
+            # Set Tags
+            ptag = request.form.get("platform-tag")
+            jobTags = [ ptag ]
+
+            # Set tags
+            for tagname in MISC_TAGS:
+                if request.form.get("tag-"+tagname):
+                    jobTags.append( tagname )
+
+            addJob.tags = jobTags
 
             # Set worksteps
             addJob.worksteps = {}
@@ -389,6 +429,9 @@ def project_add_job( login_data, project_id ):
     return render_template( "project_add_job.html",
                             user_data=login_data,
                             active='jobs',
+                            platform_selected = "win",
+                            platform_tags = PLATFORM_TAGS,
+                            tags = MISC_TAGS,
                             project=proj, commits=commitList, wsnames=wsnames )
 
 

@@ -21,7 +21,9 @@
             <div class="row">
                 <div class="col-3 gy-3">
                     <h5>{{agent.name}}</h5> ({{agent.desc}}) {{ agent.status }}
+                    <p>Last updated: {{ agent.timestamp|agestamp }}</p>
                 </div>
+                <hr>
 
 
             </div>

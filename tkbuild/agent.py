@@ -25,7 +25,6 @@ from tkbuild.artifact import TKArtifact
 from tkbuild.agentinfo import TKAgentInfo, AgentStatus
 
 # TKBUILD TODO
-#  - Add build tags to builds to filter agents (e.g. win32, dev)
 #  - Figure out "voting" or transaction based write for firebase to ensure only one agent runs a job
 #  - Figure out reliable way to stop/resume build agent on mac
 
@@ -35,6 +34,7 @@ class TKBuildAgentConfig(object):
         self.googleCredentialFile = "MISSING"
         self.googleProjectId = "my-projectid-00000"
         self.projectConfigs = []
+        logging.info("In TKBuildAgentConfig", agentConfigFile )
 
         print("Initializing build agent from config ", agentConfigFile)
         if not os.path.exists(agentConfigFile):
@@ -46,6 +46,7 @@ class TKBuildAgentConfig(object):
                 agentCfg = docs.get("build-agent")
                 print( agentCfg['name'] )
                 print( agentCfg['desc'] )
+
 
                 for projectCfgDoc in docs['projects']:
                     projectCfgData = projectCfgDoc['project']
@@ -93,6 +94,7 @@ class TKBuildAgent(object):
         agent = cls()
         agent.name = agentCfg.get( 'name', agent.name )
         agent.desc = agentCfg.get( 'desc', agent.desc )
+        agent.agentTags = agentCfg.get( 'tags', [] )
 
         agent.tkbuildDir = tkBuildDir
 
@@ -218,6 +220,7 @@ class TKBuildAgent(object):
                 agentRef = self.db.collection(u'agents').document()
 
             self.agentInfo = TKAgentInfo( self.name, self.desc, agentRef.id )
+            self.agentInfo.tags = self.agentTags
         else:
             agentRef = self.db.collection(u'agents').document( self.agentInfo.id )
 
@@ -247,6 +250,11 @@ class TKBuildAgent(object):
         for job in self.jobList:
 
             proj = self.projects[job.projectId]
+
+            # Ignore jobs with tags we can't match
+            if not self.matchTags( job.tags, self.agentInfo.tags ):
+                print("Skipping job with tags ", job.tags, "our tags are ", self.agentInfo.tags )
+                continue
 
             # Ignore jobs marked "RUN" ... this might be running on another node (todo) but
             # probably is just stale because firebase updates are not instant.
@@ -350,6 +358,14 @@ class TKBuildAgent(object):
                         logging.info( f"Cleaning up old workdir {cleanDir}" )
                         shutil.rmtree( cleanDir )
 
+    def matchTags(self, jobTags, agentTags):
+
+        # Make sure all of the tags requested in the jobTags are in our agent Tags
+        for tag in jobTags:
+            if not tag in agentTags:
+                return False
+
+        return True
 
     def failJob(self, job, wsdefFailed ):
 

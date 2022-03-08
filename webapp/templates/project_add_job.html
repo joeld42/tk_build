@@ -33,6 +33,38 @@
     <div class="mb-3 row">
 
         <div class="col-sm-2">
+            <h4>Tags:</h4>
+        </div>
+
+        <div class="form-check col-sm-2">
+
+            {% for ptag in platform_tags %}
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="platform-tag" id="tag-{{ptag}}" value="{{ptag}}"
+                       {% if platform_selected == ptag %}
+                       checked
+                       {% endif %} >
+                <label class="form-check-label" for="tag-{{ptag}}">
+                    {{ ptag }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% for tag in tags %}
+            <div class="form-check col-sm-1">
+                <input name="tag-{{tag}}" class="form-check-input" type="checkbox" value="todo" id="tag-{{tag}}">
+                <label class="form-check-label" for="tag-{{tag}}">
+                    {{ tag }}
+                </label>
+            </div>
+        {% endfor %}
+
+    </div>
+
+    <div class="mb-3 row">
+
+        <div class="col-sm-2">
             <h4>Worksteps:</h4>
         </div>
 
