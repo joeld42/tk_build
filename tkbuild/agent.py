@@ -7,7 +7,7 @@ from enum import Enum
 
 import platform
 import threading
-
+import stat
 import yaml
 
 import firebase_admin
@@ -23,6 +23,16 @@ from tkbuild.job import TKBuildJob, TKWorkstepDef, JobStatus
 from tkbuild.project import TKBuildProject
 from tkbuild.artifact import TKArtifact
 from tkbuild.agentinfo import TKAgentInfo, AgentStatus
+
+# Windows won't let you delete a tree if there is a read-only file,
+# this is used by shutil.rmtree to chmod the file if it fails
+def onCleanupError( func, path, exc_info ):
+    if not os.access( path, os.W_OK):
+        os.chmod( path, stat.S_IWUSR )
+        func( path )
+    else:
+        raise
+
 
 # TKBUILD TODO
 #  - Figure out "voting" or transaction based write for firebase to ensure only one agent runs a job
@@ -356,7 +366,12 @@ class TKBuildAgent(object):
                 for cleanDir in cleanupDirs:
                     if os.path.exists( cleanDir ):
                         logging.info( f"Cleaning up old workdir {cleanDir}" )
-                        shutil.rmtree( cleanDir )
+                        self.cleanupDir( cleanDir )
+
+    
+    def cleanupDir( self, cleanDir ):
+
+        shutil.rmtree( cleanDir, onerror=onCleanupError )
 
     def matchTags(self, jobTags, agentTags):
 
@@ -384,8 +399,16 @@ class TKBuildAgent(object):
 
         self.commitJobChanges( job )
 
+    def unbackslashPath( self, origPath ):
+        result = origPath.replace( "\\", "/" )
+        print("UnbackslashPath, result is ", result )
+        return result
+
     def archiveLog(self, job, wsdef, workstepLog ):
         proj = self.projects[job.projectId]
+
+        # un-backslash filename in case of windows shenanigans
+        workstepLog = self.unbackslashPath( workstepLog )
 
         # Check that we're configured to publish stuff
         if not proj.bucketName:
@@ -403,7 +426,7 @@ class TKBuildAgent(object):
 
             logFilename = os.path.split(workstepLog)[-1]
             bucket = self.storage_client.bucket(proj.bucketName)
-            blobName = os.path.join(proj.projectId, job.jobKey, "logs", logFilename)
+            blobName = self.unbackslashPath( os.path.join(proj.projectId, job.jobKey, "logs", logFilename) )
             blob = bucket.blob(blobName)
             result = blob.upload_from_filename(workstepLog, content_type="text/plain;charset=UTF-8")
 
@@ -451,6 +474,10 @@ class TKBuildAgent(object):
         # Make sure the file exists
         artifactFile = wsdef.artifact
         artifactFile = self.replacePathVars( artifactFile, workdirRepoPath, proj, job )
+
+        # un-backslash windows filenames
+        artifactFile = self.unbackslashPath( artifactFile )
+
         if not os.path.exists( artifactFile ):
             failMsg = f"Artifact file {artifactFile} does not exist."
             logging.warning( failMsg )
@@ -463,7 +490,8 @@ class TKBuildAgent(object):
 
             artifactFileName = os.path.split( artifactFile )[-1]
             bucket = self.storage_client.bucket( proj.bucketName )
-            blobName = os.path.join( proj.projectId, job.jobKey, artifactFileName)
+            blobName = self.unbackslashPath( os.path.join( proj.projectId, job.jobKey, artifactFileName) )
+            
             blob = bucket.blob( blobName )
             result = blob.upload_from_filename( artifactFile )
 
@@ -555,6 +583,8 @@ class TKBuildAgent(object):
                     workdirRepoPath = os.path.join(proj.workDir, job.jobDirShort)
                     if wsdef.cmd:
 
+                        print("wsdef.cmd is ", wsdef.cmd );
+
                         # Fixme: allow array args or something to handle spaces in args
                         stepCmd = []
                         for stepCmdSplit in wsdef.cmd.split():
@@ -569,9 +599,12 @@ class TKBuildAgent(object):
                         print("step command is ", stepCmd )
                         result, cmdTime = self.echoRunCommand( stepCmd, fpLog, self, job )
 
-                    elif wsdef.stepname != 'fetch':
+                    else:
                         # Fetch might not have a cmd, but other steps probably will
-                        logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
+                        if wsdef.stepname != 'fetch':
+                            logging.warning(f"Workstep {job.projectId}:{wsdef.stepname} has no cmd defined.")
+                        
+                        # No command defined, so treat step as a no-op
                         result = 0 # treat as done
                         cmdTime = datetime.timedelta(0)
 
