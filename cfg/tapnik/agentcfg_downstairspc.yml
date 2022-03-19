@@ -56,8 +56,8 @@ projects:
           cmd: "$TKBUILD\\civclicker_build_win.bat $WORKDIR $COMMIT $BUILDNUM"
           peekVersion : "$WORKDIR\\version.txt"
         - name: "package"
-          cmd: "$TKBUILD\\civclicker_package_win.bat $WORKDIR $VERSION $BUILDNUM"
-          artifact: "$WORKDIR\\export\\civclicker_$VERSION_$BUILDNUM.zip"
+          cmd: "$TKBUILD\\civclicker_package_win.bat $WORKDIR $WORKNAME $VERSION $BUILDNUM"
+          artifact: "$WORKDIR\\civclicker_$VERSION_build_$BUILDNUM.zip"
       cleanupDirs:
         - $PROJWORKDIR\\fips-build\\$WORKNAME
         - $PROJWORKDIR\\fips-deploy\\$WORKNAME

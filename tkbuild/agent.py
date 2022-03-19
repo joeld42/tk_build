@@ -474,10 +474,7 @@ class TKBuildAgent(object):
         # Make sure the file exists
         artifactFile = wsdef.artifact
         artifactFile = self.replacePathVars( artifactFile, workdirRepoPath, proj, job )
-
-        # un-backslash windows filenames
-        artifactFile = self.unbackslashPath( artifactFile )
-
+ 
         if not os.path.exists( artifactFile ):
             failMsg = f"Artifact file {artifactFile} does not exist."
             logging.warning( failMsg )
