@@ -39,3 +39,25 @@ projects:
         - name: "package"          
           cmd: "$TKBUILD\\testrepo_package.bat $WORKDIR $VERSION $BUILDNUM"
           artifact: "$WORKDIR/testrepo_$VERSION_build_$BUILDNUM.zip"
+
+
+  - project:
+      projectId: civclicker
+      projectDir: "c:\\tkbuild\\civclicker"
+      icon: "/imgs/icon_civclicker_167.png"
+      bucketName: tkbuild-artifacts
+      jobDeleteAge: 10080
+      sortKey: 1
+      worksteps:
+        - name: "fetch"
+          repoUrl: "https://github.com/joeld42/civclicker.git"
+          cmd: "$TKBUILD\\civclicker_fetch_win.bat $WORKDIR"
+        - name: "build"
+          cmd: "$TKBUILD\\civclicker_build_win.bat $WORKDIR $COMMIT $BUILDNUM"
+          peekVersion : "$WORKDIR\\version.txt"
+        - name: "package"
+          cmd: "$TKBUILD\\civclicker_package_win.bat $WORKDIR $VERSION $BUILDNUM"
+          artifact: "$WORKDIR\\export\\civclicker_$VERSION_$BUILDNUM.zip"
+      cleanupDirs:
+        - $PROJWORKDIR\\fips-build\\$WORKNAME
+        - $PROJWORKDIR\\fips-deploy\\$WORKNAME

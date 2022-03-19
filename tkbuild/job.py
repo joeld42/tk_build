@@ -181,7 +181,7 @@ class TKBuildJob(object ):
         # Worksteps is a string : string dict in both, no conversion needed
         job.worksteps =jobDict.get( 'worksteps' )
 
-        job.tags = jobDict.get( 'tags')
+        job.tags = jobDict.get( 'tags', [] )
 
         job.jobDirShort = job.projectId + "_" + jobKey
 
