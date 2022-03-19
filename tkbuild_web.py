@@ -1,6 +1,7 @@
 # flask_web/app.py
 import os, sys
 import datetime, pytz
+import platform
 from functools import wraps
 
 from flask import Flask, render_template, redirect, url_for, request, abort
@@ -485,8 +486,13 @@ def makeReadyWebApp( cfgFile, do_cloud_logging ):
 
 if __name__ == '__main__':
 
-    # TODO get this from environment or args
-    #agentCfgFile = "/opt/tkbuild/tkbuild_agent.yml"
-    agentCfgFile = "c:/Toolkits/tk_build/cfg/tapnik/tkbuild_agent_win_test.yml"
+    # TODO get this from environment or args, right now it's just hardcoded for
+    # each machine heh
+    if platform.system()=='Darwin':
+        agentCfgFile = "/opt/tkbuild/tkbuild_agent.yml"
+    else:
+        # platform.system()=='Windows'
+        agentCfgFile = "c:/Toolkits/tk_build/cfg/tapnik/tkbuild_agent_win_test.yml"
+
     makeReadyWebApp( agentCfgFile, False )
     app.run(debug=True, host='0.0.0.0')
